@@ -20,11 +20,14 @@ import {
   deleteRecipeComponents,
   getAllRecipes,
   getImExperimentsByRecipe,
+  getTpsExperimentsByRecipe,
+  getCompoundingExperimentsByRecipe,
   getRecipeById,
   getRecipeComponents,
   getRecipeUsageCount,
   insertRecipe,
   listRecipes,
+  listRecipeComponentsForRecipes,
   updateRecipe,
 } from "../repos/recipes_repo.js";
 
@@ -48,8 +51,40 @@ export function createRecipesRouter(db: Database) {
     "/recipes",
     wrap(async (req, res) => {
       const recipes = await listRecipes(db);
+      const recipeIds = recipes.map((r: any) => r.id);
+      const components = await listRecipeComponentsForRecipes(db, recipeIds);
+      const componentsByRecipe = new Map<number, any[]>();
+      for (const row of components) {
+        const list = componentsByRecipe.get(row.recipe_id) ?? [];
+        list.push(row);
+        componentsByRecipe.set(row.recipe_id, list);
+      }
+      const recipesWithComponents = recipes.map((r: any) => {
+        const list = componentsByRecipe.get(r.id) ?? [];
+        const sorted = [...list].sort(
+          (a, b) => Number(a.position || 0) - Number(b.position || 0)
+        );
+        const starch = sorted.filter(
+          (c) => Number(c.is_locked) === 1 || /starch/i.test(c.name)
+        );
+        const rest = sorted.filter(
+          (c) => !starch.includes(c)
+        );
+        const baseList = [...starch, ...rest];
+        const displayList = baseList
+          .map((c) => {
+            if (c.mode === "range" && c.parts_min !== null && c.parts_max !== null) {
+              return { name: c.name, qty: `${c.parts_min}-${c.parts_max}` };
+            }
+            if (c.parts_static !== null && c.parts_static !== undefined) {
+              return { name: c.name, qty: String(c.parts_static) };
+            }
+            return { name: c.name, qty: "" };
+          });
+        return { ...r, component_list: displayList, component_has_more: false };
+      });
       res.render("recipes_index", {
-        recipes,
+        recipes: recipesWithComponents,
       });
     })
   );
@@ -216,6 +251,8 @@ export function createRecipesRouter(db: Database) {
         recipe: null,
         components,
         imExperiments: [],
+        tpsExperiments: [],
+        compExperiments: [],
         action: "/recipes",
       });
     })
@@ -230,11 +267,18 @@ export function createRecipesRouter(db: Database) {
 
       const components = await getRecipeComponents(db, recipeId);
       const imExperiments = await getImExperimentsByRecipe(db, recipeId);
+      const tpsExperiments = await getTpsExperimentsByRecipe(db, recipeId);
+      const compExperiments = await getCompoundingExperimentsByRecipe(
+        db,
+        recipeId
+      );
 
       res.render("recipe_form", {
         recipe,
         components: components.length ? components : defaultRecipeComponents(),
         imExperiments,
+        tpsExperiments,
+        compExperiments,
         action: `/recipes/${recipeId}`,
       });
     })

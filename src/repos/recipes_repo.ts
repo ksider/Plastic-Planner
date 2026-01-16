@@ -14,6 +14,21 @@ export async function listRecipes(db: Database) {
   );
 }
 
+export async function listRecipeComponentsForRecipes(
+  db: Database,
+  recipeIds: number[]
+) {
+  if (!recipeIds.length) return [];
+  const placeholders = recipeIds.map(() => "?").join(",");
+  return db.all(
+    `SELECT recipe_id, name, mode, parts_static, parts_min, parts_max, position, is_locked
+     FROM recipe_components
+     WHERE recipe_id IN (${placeholders})
+     ORDER BY recipe_id, position`,
+    recipeIds
+  );
+}
+
 export async function getRecipeById(db: Database, recipeId: number) {
   return db.get("SELECT id, name, description FROM recipes WHERE id = ?", [
     recipeId,
@@ -36,6 +51,32 @@ export async function getImExperimentsByRecipe(db: Database, recipeId: number) {
      FROM im_experiments e
      JOIN im_experiment_recipes er ON er.experiment_id = e.id
      WHERE er.recipe_id = ?
+     ORDER BY e.created_at DESC`,
+    [recipeId]
+  );
+}
+
+export async function getTpsExperimentsByRecipe(db: Database, recipeId: number) {
+  return db.all(
+    `SELECT e.id, e.name, e.created_at
+     FROM tps_experiments e
+     JOIN tps_experiment_recipes er ON er.experiment_id = e.id
+     WHERE er.recipe_id = ?
+     ORDER BY e.created_at DESC`,
+    [recipeId]
+  );
+}
+
+export async function getCompoundingExperimentsByRecipe(
+  db: Database,
+  recipeId: number
+) {
+  return db.all(
+    `SELECT e.id, e.name, e.created_at
+     FROM experiments e
+     JOIN batches b ON b.experiment_id = e.id
+     WHERE b.recipe_id = ?
+     GROUP BY e.id
      ORDER BY e.created_at DESC`,
     [recipeId]
   );

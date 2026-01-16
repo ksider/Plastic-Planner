@@ -91,9 +91,59 @@
         </form>
       </div>
       <% if (recipe) { %>
-        <div class="card">
-          <h2>Injection Molding Experiments</h2>
-          <% if (imExperiments && imExperiments.length > 0) { %>
+        <% if (compExperiments && compExperiments.length > 0) { %>
+          <div class="card">
+            <h2>Compounding Experiments</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Created</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% compExperiments.forEach((e) => { %>
+                    <tr>
+                      <td><%= e.name %></td>
+                      <td><%= e.created_at %></td>
+                      <td><a class="btn secondary" href="/experiments/<%= e.id %>">Open</a></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% } %>
+        <% if (tpsExperiments && tpsExperiments.length > 0) { %>
+          <div class="card">
+            <h2>TPS Lab Experiments</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Created</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% tpsExperiments.forEach((e) => { %>
+                    <tr>
+                      <td><%= e.name %></td>
+                      <td><%= e.created_at %></td>
+                      <td><a class="btn secondary" href="/tps/<%= e.id %>">Open</a></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% } %>
+        <% if (imExperiments && imExperiments.length > 0) { %>
+          <div class="card">
+            <h2>Injection Molding Experiments</h2>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -114,10 +164,8 @@
                 </tbody>
               </table>
             </div>
-          <% } else { %>
-            <div class="note">No injection molding experiments yet for this recipe.</div>
-          <% } %>
-        </div>
+          </div>
+        <% } %>
       <% } %>
     </main>
 

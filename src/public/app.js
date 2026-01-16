@@ -131,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupRecipeComponents();
   setupRecipePaste();
   setupRecipeList();
+  setupRecipeSearch();
   setupExperimentValidation();
   setupMoldingConfirm();
   setupFieldToggles();
@@ -172,6 +173,30 @@ function setupRecipeList() {
       });
     });
   });
+}
+
+function setupRecipeSearch() {
+  const input = document.querySelector("[data-recipe-search]");
+  if (!input) return;
+  const cards = Array.from(document.querySelectorAll(".recipe-card"));
+  if (cards.length === 0) return;
+
+  const runFilter = () => {
+    const query = (input.value || "").trim().toLowerCase();
+    if (!query) {
+      cards.forEach((card) => {
+        card.style.display = "";
+      });
+      return;
+    }
+    cards.forEach((card) => {
+      const hay = (card.getAttribute("data-recipe-text") || "").toLowerCase();
+      card.style.display = hay.includes(query) ? "" : "none";
+    });
+  };
+
+  input.addEventListener("input", runFilter);
+  input.addEventListener("search", runFilter);
 }
 
 function setupRecipeComponents() {

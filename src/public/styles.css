@@ -313,6 +313,11 @@ table tbody tr:hover {
   color: #5a4a22;
 }
 
+.badge.imported {
+  background: #dfe8f4;
+  color: #2f496f;
+}
+
 .badge.tiny {
   margin-left: 0;
   font-size: 10px;
@@ -442,6 +447,131 @@ table tbody tr:hover {
   opacity: 0;
   transition: opacity 0.1s ease;
   z-index: 10;
+}
+
+.recipe-card-grid {
+  column-gap: 16px;
+  column-count: 2;
+}
+
+.recipe-search {
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d8d2c5;
+  background: #fff;
+  font-size: 14px;
+}
+
+@media (min-width: 900px) {
+  .recipe-card-grid {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1200px) {
+  .recipe-card-grid {
+    column-count: 4;
+  }
+}
+
+@media (min-width: 1500px) {
+  .recipe-card-grid {
+    column-count: 5;
+  }
+}
+
+.recipe-card {
+  background: #f3efe2;
+  border: 1px solid #e4ded2;
+  border-radius: 22px;
+  padding: 16px 16px 14px;
+  display: grid;
+  gap: 10px;
+  min-height: 200px;
+  break-inside: avoid;
+  margin: 0 0 16px;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recipe-card:hover {
+  background: #ffffff;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+.recipe-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.recipe-card-header h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.recipe-desc {
+  color: #4b4b46;
+  font-size: 14px;
+}
+
+.recipe-subtag {
+  font-size: 11px;
+  color: #6b6355;
+  background: #efeae0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.recipe-components {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  width: fit-content;
+  font-weight: 600;
+  color: #2c2c28;
+}
+
+.recipe-comp-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  align-items: baseline;
+}
+
+.recipe-comp-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.recipe-comp-name::after {
+  content: "";
+  flex: 1 1 auto;
+  border-bottom: 1px dotted rgba(44, 44, 40, 0.35);
+  transform: translateY(-2px);
+}
+
+.recipe-comp-qty {
+  text-align: left;
+  min-width: 48px;
+}
+
+.recipe-comp-more {
+  font-size: 12px;
+  color: #6b6355;
+}
+
+.recipe-card-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .compact-table {

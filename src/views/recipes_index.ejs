@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <title>Recipes</title>
     <link rel="stylesheet" href="/public/styles.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+    <script defer src="/public/app.js"></script>
   </head>
   <body>
     <header>
@@ -14,54 +16,59 @@
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h2>Saved Recipes</h2>
-          <div style="display:flex; gap:8px;">
-            <a class="btn" href="/recipes/new">New Recipe</a>
-            <a class="btn secondary" href="/recipes/import-bpacks">Import from BPACKs CSV</a>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="search" class="recipe-search" placeholder="Search recipes..." data-recipe-search />
+            <a class="icon-btn" href="/recipes/new" title="New recipe" aria-label="New recipe">
+              <span class="material-symbols-outlined">add_circle</span>
+            </a>
+            <a class="icon-btn" href="/recipes/import-bpacks" title="Import from BPACKs CSV" aria-label="Import from BPACKs CSV">
+              <span class="material-symbols-outlined">upload_file</span>
+            </a>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Description</th>
-                <th>Created</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (recipes.length === 0) { %>
-                <tr>
-                  <td colspan="4">No recipes yet.</td>
-                </tr>
-              <% } %>
-              <% recipes.forEach((r) => { %>
-                <% const isImported = (r.description || '').trim().toLowerCase() === 'imported from bpacks csv'; %>
-                <tr>
-                  <td>
-                    <%= r.name %>
+        <% if (recipes.length === 0) { %>
+          <div class="note">No recipes yet.</div>
+        <% } else { %>
+          <div class="recipe-card-grid">
+            <% recipes.forEach((r) => { %>
+              <% const isImported = (r.description || '').trim().toLowerCase() === 'imported from bpacks csv'; %>
+              <div class="recipe-card" data-recipe-text="<%= [r.name, r.description || '', (r.component_list || []).map((c) => c.name + ' ' + c.qty).join(' ')].join(' ').toLowerCase() %>">
+                <div class="recipe-card-header">
+                  <h3><%= r.name %></h3>
+                  <div>
                     <% if (r.has_range) { %>
                       <span class="badge">min-max</span>
                     <% } %>
                     <% if (isImported) { %>
-                      <span class="badge tiny">Imported from BPACKs CSV</span>
+                      <span class="badge imported">import</span>
                     <% } %>
-                  </td>
-                  <td><%= isImported ? '' : (r.description || '') %></td>
-                  <td><%= r.created_at %></td>
-                  <td>
-                    <div style="display:flex; gap:8px;">
-                      <a class="btn secondary" href="/recipes/<%= r.id %>">Edit</a>
-                      <form method="POST" action="/recipes/<%= r.id %>/delete" onsubmit="return confirm('Delete recipe?')">
-                        <button class="btn" type="submit">Delete</button>
-                      </form>
+                  </div>
+                </div>
+                <% if (!isImported && r.description) { %>
+                  <div class="recipe-desc"><%= r.description %></div>
+                <% } %>
+                <div class="recipe-components">
+                  <% (r.component_list || []).forEach((line) => { %>
+                    <div class="recipe-comp-line">
+                      <span class="recipe-comp-name"><%= line.name %></span>
+                      <span class="recipe-comp-qty"><%= line.qty %></span>
                     </div>
-                  </td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
+                  <% }) %>
+                </div>
+                <div class="recipe-card-actions">
+                  <a class="icon-btn" title="Edit" href="/recipes/<%= r.id %>">
+                    <span class="material-symbols-outlined">settings</span>
+                  </a>
+                  <form method="POST" action="/recipes/<%= r.id %>/delete" onsubmit="return confirm('Delete recipe?')">
+                    <button class="icon-btn danger" type="submit" title="Delete">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
       </div>
     </main>
   </body>
