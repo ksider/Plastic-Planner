@@ -1,0 +1,330 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title><%= experiment.name %></title>
+    <link rel="stylesheet" href="/public/styles.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+    <script defer src="/public/app.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script defer src="/public/tps.js"></script>
+    <script defer src="/public/tps_analysis.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1><%= experiment.name %></h1>
+      <%- include('partials/nav', { active: 'tps' }) %>
+      <div class="small">Seed: <%= experiment.seed %></div>
+      <form method="POST" action="/tps/<%= experiment.id %>/delete" onsubmit="return confirm('Delete experiment and all data?')" style="margin-top:8px;">
+        <button class="btn secondary" type="submit">Delete Experiment</button>
+      </form>
+    </header>
+    <main>
+      <div class="tab-buttons">
+        <button class="active" data-tab-target="tab-tps-design">Design</button>
+        <button data-tab-target="tab-tps-runs">Runs</button>
+        <button data-tab-target="tab-tps-analysis">Analysis</button>
+      </div>
+
+      <section id="tab-tps-design" class="tab-panel active">
+        <div class="card">
+          <h2>Process settings</h2>
+          <form method="POST" action="/tps/<%= experiment.id %>/params" data-tps-param-form data-experiment-id="<%= experiment.id %>" data-redirect="#tab-tps-design">
+            <div class="table-wrap">
+              <table class="im-params">
+                <thead>
+                  <tr>
+                    <th>Active</th>
+                    <th>Parameter</th>
+                    <th>Mode</th>
+                    <th>Value</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% params.forEach((def) => { %>
+                    <% const cfg = def.config || {}; %>
+                    <tr data-param-row data-param-id="<%= def.id %>" data-mode="<%= cfg.mode || 'FIXED' %>">
+                      <td>
+                        <input type="hidden" name="params[<%= def.id %>][active]" value="0" />
+                        <input type="checkbox" name="params[<%= def.id %>][active]" value="1" <%= cfg.active ? 'checked' : '' %> />
+                      </td>
+                      <td>
+                        <div><strong><%= def.label %></strong></div>
+                        <div class="small"><%= def.unit ? def.unit : '' %></div>
+                      </td>
+                      <td>
+                        <select name="params[<%= def.id %>][mode]" data-mode-select>
+                          <option value="FIXED" <%= cfg.mode === 'FIXED' ? 'selected' : '' %>>FIXED</option>
+                          <option value="RANGE" <%= cfg.mode === 'RANGE' ? 'selected' : '' %>>RANGE</option>
+                          <option value="LIST" <%= cfg.mode === 'LIST' ? 'selected' : '' %>>LIST</option>
+                        </select>
+                      </td>
+                      <td>
+                        <div class="param-inputs">
+                          <input class="mode-fixed" data-field="fixed_value" type="text" inputmode="decimal" name="params[<%= def.id %>][fixed_value]" placeholder="Fixed" value="<%= cfg.fixed_value ?? '' %>" />
+                          <input class="mode-range" data-field="range_min" type="text" inputmode="decimal" name="params[<%= def.id %>][range_min]" placeholder="Min" value="<%= cfg.range_min ?? '' %>" />
+                          <input class="mode-range" data-field="range_max" type="text" inputmode="decimal" name="params[<%= def.id %>][range_max]" placeholder="Max" value="<%= cfg.range_max ?? '' %>" />
+                          <input class="mode-list" data-field="list_values" type="text" name="params[<%= def.id %>][list_values]" placeholder="List: 1,2,3" value="<%= def.listString || '' %>" />
+                        </div>
+                      </td>
+                      <td>
+                        <button class="icon-btn danger" type="button" data-tps-delete-param="/tps/<%= experiment.id %>/params/<%= def.id %>/delete" aria-label="Remove setting">✕</button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <div style="margin-top:12px;">
+              <button type="button" class="secondary" data-open-modal="tps-param-modal">Add setting</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal" data-modal="tps-param-modal">
+          <div class="modal-backdrop" data-close-modal="tps-param-modal"></div>
+          <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3 style="margin:0;">Add setting</h3>
+              <button type="button" class="icon-btn" data-close-modal="tps-param-modal" aria-label="Close">✕</button>
+            </div>
+            <div class="inline-grid" style="margin-top:12px;">
+              <form method="POST" action="/tps/<%= experiment.id %>/add-param">
+                <h4 style="margin:0 0 8px;">Standard setting</h4>
+                <div>
+                  <label>Setting</label>
+                  <select name="param_def_id" data-standard-setting>
+                    <% availableDefs.forEach((def) => { %>
+                      <option value="<%= def.id %>" data-default-min="<%= def.min_default ?? '' %>" data-default-max="<%= def.max_default ?? '' %>"><%= def.label %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <label>Mode</label>
+                  <select name="mode" data-modal-mode>
+                    <option value="FIXED">FIXED</option>
+                    <option value="RANGE">RANGE</option>
+                    <option value="LIST">LIST</option>
+                  </select>
+                </div>
+                <div data-mode-inputs>
+                  <div>
+                    <label>Fixed</label>
+                    <input class="mode-fixed" name="fixed_value" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Min</label>
+                    <input class="mode-range" name="range_min" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Max</label>
+                    <input class="mode-range" name="range_max" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>List</label>
+                    <input class="mode-list" name="list_values" placeholder="1,2,3" />
+                  </div>
+                </div>
+                <div style="margin-top:12px;">
+                  <button type="submit">Add setting</button>
+                </div>
+              </form>
+              <form method="POST" action="/tps/<%= experiment.id %>/add-custom-param">
+                <h4 style="margin:0 0 8px;">Custom setting</h4>
+                <div>
+                  <label>Label</label>
+                  <input name="label" required />
+                </div>
+                <div>
+                  <label>Unit</label>
+                  <input name="unit" placeholder="°C, min, level" />
+                </div>
+                <div>
+                  <label>Mode</label>
+                  <select name="mode" data-modal-mode>
+                    <option value="FIXED">FIXED</option>
+                    <option value="RANGE">RANGE</option>
+                    <option value="LIST">LIST</option>
+                  </select>
+                </div>
+                <div data-mode-inputs>
+                  <div>
+                    <label>Fixed</label>
+                    <input class="mode-fixed" name="fixed_value" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Min</label>
+                    <input class="mode-range" name="range_min" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Max</label>
+                    <input class="mode-range" name="range_max" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>List</label>
+                    <input class="mode-list" name="list_values" placeholder="1,2,3" />
+                  </div>
+                </div>
+                <div style="margin-top:12px;">
+                  <button type="submit">Add custom setting</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-tps-runs" class="tab-panel">
+        <div class="card">
+          <h2>Run Matrix</h2>
+          <% if (warning) { %>
+            <div class="note"><%= warning %></div>
+          <% } %>
+          <form method="POST" action="/tps/<%= experiment.id %>/generate-runs" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;" data-recipe-count="<%= recipeVariantCount || 1 %>">
+            <div>
+              <label>Max runs</label>
+              <input name="max_runs" type="number" min="1" value="<%= maxRunsDefault || 16 %>" data-max-runs-input data-auto="1" />
+              <div class="small" data-max-runs-label></div>
+            </div>
+            <button type="submit">Generate runs</button>
+          </form>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <div class="small">Custom output fields appear as new columns.</div>
+            <button type="button" class="secondary" data-open-field-modal>Add Output Field</button>
+          </div>
+          <div class="modal" id="tps-field-modal" aria-hidden="true">
+            <div class="modal-backdrop" data-close-field-modal></div>
+            <div class="modal-card">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0;" data-field-modal-title>Add Output Field</h3>
+                <button type="button" class="icon-btn" data-close-field-modal aria-label="Close">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <form method="POST" action="/tps/<%= experiment.id %>/fields" data-add-action="/tps/<%= experiment.id %>/fields" class="inline-grid" style="margin-top:12px;" data-field-form>
+                <input type="hidden" name="key" value="" data-field-key-input />
+                <div>
+                  <label>Field name</label>
+                  <input name="label" placeholder="e.g. Moisture %" required data-field-label-input />
+                </div>
+                <div>
+                  <label>Type</label>
+                  <select name="type" data-field-type-input>
+                    <option value="number">Number</option>
+                    <option value="text">Text</option>
+                    <option value="tags">Tags</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Tag options (comma-separated)</label>
+                  <input name="options" placeholder="flexible, brittle" data-field-options-input />
+                </div>
+                <div style="align-self:end; display:flex; gap:8px;">
+                  <button type="button" class="secondary" data-close-field-modal>Cancel</button>
+                  <button type="submit">Add Field</button>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div class="table-wrap" style="margin-top:12px;">
+            <table id="tps-runs-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>RunCode</th>
+                  <th>Recipe</th>
+                  <% activeDefs.forEach((def) => { %>
+                    <th><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></th>
+                  <% }) %>
+                  <% outputFields.forEach((field) => { %>
+                    <th>
+                      <div class="field-header">
+                        <span><%= field.label %></span>
+                        <div class="field-icons">
+                          <% if (field.type === 'number') { %>
+                            <label class="icon-toggle" title="Include in analysis">
+                              <input type="checkbox" data-tps-field-toggle data-field-key="<%= field.key %>" <%= field.is_core ? 'data-field-core=\"1\"' : '' %> <%= analysisMetricKeys.includes(field.key) ? 'checked' : '' %> />
+                              <span class="material-symbols-outlined">analytics</span>
+                            </label>
+                          <% } %>
+                          <button type="button" class="icon-btn" title="Edit" data-edit-field data-field-key="<%= field.key %>" data-field-label="<%= field.label %>" data-field-type="<%= field.type %>" data-field-options="<%= (field.options || []).join(', ') %>" data-field-core="<%= field.is_core ? '1' : '0' %>" data-field-default="<%= field.is_default ? '1' : '0' %>">
+                            <span class="material-symbols-outlined">edit</span>
+                          </button>
+                          <% if (!field.is_default) { %>
+                            <form method="POST" action="/tps/<%= experiment.id %>/fields/<%= field.key %>/delete" class="field-delete-form" onsubmit="return confirm('Delete this field and its data?')">
+                              <button type="submit" class="icon-btn" title="Delete">
+                                <span class="material-symbols-outlined">delete</span>
+                              </button>
+                            </form>
+                          <% } %>
+                        </div>
+                      </div>
+                    </th>
+                  <% }) %>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (runs.length === 0) { %>
+                  <tr><td colspan="<%= 4 + activeDefs.length + outputFields.length %>">No runs yet.</td></tr>
+                <% } %>
+                <% runs.forEach((run) => { %>
+                  <% const outputs = run.outputs_json ? JSON.parse(run.outputs_json) : {}; %>
+                  <tr class="<%= run.done ? 'row-done' : '' %>">
+                    <td><%= run.run_order %></td>
+                    <td>
+                      <a href="/tps/<%= experiment.id %>/runs/<%= run.id %>"><%= run.run_code %></a>
+                      <% if (run.done) { %>
+                        <span class="badge ok">DONE</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <%= run.recipe_name || '' %>
+                      <% if (run.recipe_variant) { %>
+                        <span class="badge tiny"><%= run.recipe_variant %></span>
+                      <% } %>
+                    </td>
+                    <% activeDefs.forEach((def) => { %>
+                      <td><%= formatNumber(run.keyValues[def.code]) %></td>
+                    <% }) %>
+                    <% outputFields.forEach((field) => { %>
+                      <td>
+                        <% if (field.type === 'tags') { %>
+                          <select data-inline-save data-url="/tps/<%= experiment.id %>/runs/<%= run.id %>" name="output__<%= field.key %>">
+                            <option value=""></option>
+                            <% (field.options || []).forEach((opt) => { %>
+                              <option value="<%= opt %>" <%= outputs[field.key] === opt ? 'selected' : '' %>><%= opt %></option>
+                            <% }) %>
+                          </select>
+                        <% } else { %>
+                          <input data-inline-save data-url="/tps/<%= experiment.id %>/runs/<%= run.id %>" name="output__<%= field.key %>" value="<%= outputs[field.key] ?? '' %>" />
+                        <% } %>
+                      </td>
+                    <% }) %>
+                    <td>
+                      <textarea data-inline-save data-url="/tps/<%= experiment.id %>/runs/<%= run.id %>" name="notes"><%= run.notes ?? '' %></textarea>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-tps-analysis" class="tab-panel">
+        <div class="card">
+          <h2>Decision Support</h2>
+          <div id="analysis-quality" data-analysis-endpoint="/tps/<%= experiment.id %>/analysis.json"></div>
+          <div id="analysis-insights" style="margin-top:12px;"></div>
+        </div>
+        <div class="card">
+          <h2>Visuals</h2>
+          <div id="analysis-visuals" class="chart-grid"></div>
+        </div>
+        <div id="analysis-metric-tables"></div>
+      </section>
+    </main>
+  </body>
+</html>

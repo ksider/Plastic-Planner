@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>TPS Lab Experiments</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>TPS Lab Experiments</h1>
+      <%- include('partials/nav', { active: 'tps' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2>TPS Lab Experiments</h2>
+          <a class="btn" href="/tps/new">New TPS Experiment</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Runs</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (experiments.length === 0) { %>
+                <tr><td colspan="5">No TPS experiments yet.</td></tr>
+              <% } %>
+              <% experiments.forEach((e) => { %>
+                <tr>
+                  <td><%= e.id %></td>
+                  <td><a href="/tps/<%= e.id %>"><%= e.name %></a></td>
+                  <td><%= e.run_count %></td>
+                  <td><%= e.created_at %></td>
+                  <td>
+                    <form method="POST" action="/tps/<%= e.id %>/delete" onsubmit="return confirm('Delete this TPS experiment? This cannot be undone.');">
+                      <button class="link danger" type="submit">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

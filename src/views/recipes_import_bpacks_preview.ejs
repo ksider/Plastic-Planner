@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Import Preview</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Import Preview</h1>
+      <%- include('partials/nav', { active: 'recipes' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <div class="inline-grid">
+          <div>
+            <div class="small">File</div>
+            <div><%= filename %></div>
+          </div>
+          <div>
+            <div class="small">Detected delimiter</div>
+            <div><%= delimiter %></div>
+          </div>
+          <div>
+            <div class="small">Recipes</div>
+            <div><%= recipes.length %></div>
+          </div>
+        </div>
+        <% if (warnings.length > 0) { %>
+          <div class="note">
+            <strong>Warnings:</strong>
+            <ul>
+              <% warnings.forEach((w) => { %>
+                <li><%= w %></li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="card">
+        <h2>Detected recipes</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Recipe</th>
+                <th>Components</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (componentCounts.length === 0) { %>
+                <tr><td colspan="2">No recipes detected.</td></tr>
+              <% } %>
+              <% componentCounts.forEach((r) => { %>
+                <tr>
+                  <td><%= r.name %></td>
+                  <td><%= r.count %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <form method="POST" action="/recipes/import-bpacks/confirm">
+          <input type="hidden" name="payload_json" value="<%= payloadJson %>" />
+          <button class="btn" type="submit">Confirm import</button>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>

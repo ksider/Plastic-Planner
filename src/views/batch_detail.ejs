@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title><%= batch.batch_code %></title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1><%= batch.batch_code %></h1>
+      <div class="small"><%= experiment.name %> · <%= batch.recipe_name %></div>
+      <%- include('partials/nav', { active: 'compounding' }) %>
+      <div style="margin-top:8px;">
+        <a class="btn secondary" href="/experiments/<%= experiment.id %>">Back to experiment</a>
+      </div>
+    </header>
+
+    <main class="run-page">
+      <div class="card run-hero">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <h2 style="margin:0;">Recipe / Weighing</h2>
+          <% if (batch.done) { %>
+            <span class="badge ok">DONE</span>
+          <% } %>
+        </div>
+        <div class="table-wrap">
+          <table class="weights-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Weight (g)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% weights.forEach((row) => { %>
+                <tr>
+                  <td><%= row.name %></td>
+                  <td>
+                    <div><%= formatNumber(row.grams, 2) %></div>
+                    <% if (row.phr !== null) { %>
+                      <div class="small">phr: <%= formatNumber(row.phr, 2) %></div>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+              <tr>
+                <td><strong>Total</strong></td>
+                <td><strong><%= formatNumber(batch.total_g, 2) %></strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Measured parameters</h2>
+        <form method="POST" action="/experiments/<%= experiment.id %>/batches/<%= batch.id %>" class="run-form">
+          <input type="hidden" name="redirect_to" value="/experiments/<%= experiment.id %>/batches/<%= batch.id %>" />
+          <label>
+            <span>Head C set</span>
+            <input type="number" inputmode="decimal" name="head_set" value="<%= batch.head_set ?? '' %>" />
+          </label>
+          <label>
+            <span>Head C actual</span>
+            <input type="number" inputmode="decimal" name="head_actual" value="<%= batch.head_actual ?? '' %>" />
+          </label>
+          <label>
+            <span>Moist after dry (%)</span>
+            <input type="number" inputmode="decimal" name="moist_after_dry" value="<%= batch.moist_after_dry ?? '' %>" />
+          </label>
+          <label>
+            <span>Moist before mold (%)</span>
+            <input type="number" inputmode="decimal" name="moist_before_mold" value="<%= batch.moist_before_mold ?? '' %>" />
+          </label>
+          <label>
+            <span>Notes</span>
+            <textarea name="notes_compound" rows="4"><%= batch.notes_compound ?? '' %></textarea>
+          </label>
+          <div class="done-toggle">
+            <span>Done</span>
+            <label class="switch">
+              <input type="hidden" name="done" value="0" />
+              <input type="checkbox" name="done" value="1" <%= batch.done ? 'checked' : '' %> />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <button type="submit">Save</button>
+        </form>
+      </div>
+
+      <div class="card run-nav">
+        <% if (prevId) { %>
+          <a class="btn secondary" href="/experiments/<%= experiment.id %>/batches/<%= prevId %>">Prev batch</a>
+        <% } else { %>
+          <span class="muted">Prev batch</span>
+        <% } %>
+        <% if (nextId) { %>
+          <a class="btn secondary" href="/experiments/<%= experiment.id %>/batches/<%= nextId %>">Next batch</a>
+        <% } else { %>
+          <span class="muted">Next batch</span>
+        <% } %>
+      </div>
+    </main>
+  </body>
+</html>

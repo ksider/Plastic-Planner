@@ -1,0 +1,176 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title><%= recipe ? 'Edit Recipe' : 'New Recipe' %></title>
+    <link rel="stylesheet" href="/public/styles.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+    <script defer src="/public/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1><%= recipe ? 'Edit Recipe' : 'New Recipe' %></h1>
+      <%- include('partials/nav', { active: 'recipes' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <form method="POST" action="<%= action %>" data-recipe-form>
+          <div class="inline-grid">
+            <div>
+              <label>Recipe code</label>
+              <input name="name" value="<%= recipe ? recipe.name : '' %>" required />
+            </div>
+            <div>
+              <label>Description</label>
+              <input name="description" value="<%= recipe ? (recipe.description || '') : '' %>" />
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3>Mass Parts Table</h3>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="secondary" data-open-paste>Paste list</button>
+                <button type="button" class="secondary" data-add-component>Add component</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table id="recipe-components" data-next-index="<%= components.length %>">
+                <thead>
+                  <tr>
+                    <th>Component</th>
+                    <th>Mode</th>
+                    <th>Static parts</th>
+                    <th>Min parts</th>
+                    <th>Max parts</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% components.forEach((c, idx) => { %>
+                    <tr class="component-row" data-locked="<%= c.is_locked %>">
+                      <td>
+                        <input name="components[<%= idx %>][name]" value="<%= c.name %>" <%= c.is_locked ? 'readonly' : '' %> />
+                      </td>
+                      <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <label class="switch">
+                            <input type="checkbox" data-mode-toggle <%= c.mode === 'range' ? 'checked' : '' %> />
+                            <span class="slider"></span>
+                          </label>
+                          <span class="small">Min‑Max</span>
+                        </div>
+                        <input type="hidden" name="components[<%= idx %>][mode]" value="<%= c.mode %>" data-mode-input />
+                      </td>
+                      <td>
+                        <input name="components[<%= idx %>][parts_static]" type="number" step="0.1" value="<%= c.parts_static ?? '' %>" data-mode-static />
+                      </td>
+                      <td>
+                        <input name="components[<%= idx %>][parts_min]" type="number" step="0.1" value="<%= c.parts_min ?? '' %>" data-mode-min />
+                      </td>
+                      <td>
+                        <input name="components[<%= idx %>][parts_max]" type="number" step="0.1" value="<%= c.parts_max ?? '' %>" data-mode-max />
+                      </td>
+                      <td>
+                        <button type="button" class="icon-btn" data-remove-component title="Remove" <%= c.is_locked ? 'disabled' : '' %>>
+                          <span class="material-symbols-outlined">close</span>
+                        </button>
+                        <input type="hidden" name="components[<%= idx %>][id]" value="<%= c.id ?? '' %>" />
+                        <input type="hidden" name="components[<%= idx %>][remove]" value="0" data-remove-flag />
+                        <input type="hidden" name="components[<%= idx %>][is_locked]" value="<%= c.is_locked %>" />
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <div class="small">Use Min-Max to store a range. For batch weights, the midpoint is used.</div>
+          </div>
+
+          <button type="submit" style="margin-top:12px;">Save Recipe</button>
+        </form>
+      </div>
+      <% if (recipe) { %>
+        <div class="card">
+          <h2>Injection Molding Experiments</h2>
+          <% if (imExperiments && imExperiments.length > 0) { %>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Created</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% imExperiments.forEach((e) => { %>
+                    <tr>
+                      <td><%= e.name %></td>
+                      <td><%= e.created_at %></td>
+                      <td><a class="btn secondary" href="/im/<%= e.id %>">Open</a></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <div class="note">No injection molding experiments yet for this recipe.</div>
+          <% } %>
+        </div>
+      <% } %>
+    </main>
+
+    <template id="component-row-template">
+      <tr class="component-row" data-locked="0">
+        <td>
+          <input name="components[__INDEX__][name]" value="" />
+        </td>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label class="switch">
+              <input type="checkbox" data-mode-toggle />
+              <span class="slider"></span>
+            </label>
+            <span class="small">Min‑Max</span>
+          </div>
+          <input type="hidden" name="components[__INDEX__][mode]" value="static" data-mode-input />
+        </td>
+        <td>
+          <input name="components[__INDEX__][parts_static]" type="number" step="0.1" data-mode-static />
+        </td>
+        <td>
+          <input name="components[__INDEX__][parts_min]" type="number" step="0.1" data-mode-min />
+        </td>
+        <td>
+          <input name="components[__INDEX__][parts_max]" type="number" step="0.1" data-mode-max />
+        </td>
+        <td>
+          <button type="button" class="icon-btn" data-remove-component title="Remove">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <input type="hidden" name="components[__INDEX__][remove]" value="0" data-remove-flag />
+          <input type="hidden" name="components[__INDEX__][is_locked]" value="0" />
+        </td>
+      </tr>
+    </template>
+
+    <div class="modal" id="paste-modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-paste></div>
+      <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Paste Components</h3>
+          <button type="button" class="icon-btn" data-close-paste aria-label="Close">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="small" style="margin:8px 0;">First line can be recipe name. Next lines: Component [tab] parts. Use 10-20 for Min-Max.</div>
+        <textarea rows="8" data-paste-input placeholder="Barkstar PS ATBS-ESBO&#10;Corn starch (fg)\t100&#10;Glycerol\t0"></textarea>
+        <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
+          <button type="button" class="secondary" data-close-paste>Cancel</button>
+          <button type="button" data-apply-paste>Apply</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>New TPS Experiment</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+    <script defer src="/public/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>New TPS Experiment</h1>
+      <%- include('partials/nav', { active: 'tps' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <form method="POST" action="/tps">
+          <div class="inline-grid">
+            <div>
+              <label>Experiment name</label>
+              <input name="name" required />
+            </div>
+            <div>
+              <label>Seed (optional)</label>
+              <input name="seed" type="number" inputmode="numeric" />
+            </div>
+            <div style="grid-column:1/-1;">
+              <label>Notes</label>
+              <textarea name="notes" rows="2"></textarea>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>Select Recipes</h3>
+            <% if (recipes.length === 0) { %>
+              <div class="note">No recipes yet. Create recipes first.</div>
+            <% } %>
+            <div class="recipe-select-list" data-recipe-list>
+              <% recipes.forEach((r) => { %>
+                <button type="button" class="recipe-pill" data-recipe-pill>
+                  <input type="checkbox" name="recipe_ids" value="<%= r.id %>" />
+                  <span><%= r.name %></span>
+                  <% if (r.has_range) { %>
+                    <span class="badge">min-max</span>
+                  <% } %>
+                </button>
+              <% }) %>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <button type="submit">Create TPS Experiment</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>

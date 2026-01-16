@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Import Result</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Import Result</h1>
+      <%- include('partials/nav', { active: 'recipes' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <div class="inline-grid">
+          <div>
+            <div class="small">Created</div>
+            <div><%= created %></div>
+          </div>
+          <div>
+            <div class="small">Updated</div>
+            <div><%= updated %></div>
+          </div>
+          <div>
+            <div class="small">Components inserted</div>
+            <div><%= componentsInserted %></div>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <a class="btn" href="/recipes">Back to Recipes</a>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

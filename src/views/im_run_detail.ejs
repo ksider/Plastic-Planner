@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title><%= run.run_code %></title>
+    <link rel="stylesheet" href="/public/styles.css" />
+    <script defer src="/public/im.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1><%= run.run_code %></h1>
+      <div class="small"><%= experiment.name %> · <%= run.recipe_name || 'No recipe' %></div>
+      <%- include('partials/nav', { active: 'im' }) %>
+      <div style="margin-top:8px;">
+        <a class="btn secondary" href="/im/<%= experiment.id %>">Back to experiment</a>
+      </div>
+    </header>
+    <main class="run-page">
+      <div class="card">
+        <h2>Experiment settings</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (settingsList.length === 0) { %>
+                <tr><td colspan="2">No active settings.</td></tr>
+              <% } %>
+              <% settingsList.forEach((item) => { %>
+                <tr>
+                  <td><%= item.label %></td>
+                  <td><%= item.value %> <%= item.unit ? item.unit : '' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card run-hero">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <h2 style="margin:0;">Run status</h2>
+          <% if (run.done) { %>
+            <span class="badge ok">DONE</span>
+          <% } %>
+        </div>
+        <form method="POST" action="/im/<%= experiment.id %>/runs/<%= run.id %>" class="run-form" data-im-run-form data-im-run-url="/im/<%= experiment.id %>/runs/<%= run.id %>">
+          <div class="small">
+            Recipe: <strong><%= run.recipe_name || '—' %></strong>
+            <% if (run.recipe_variant) { %>
+              <span class="badge tiny"><%= run.recipe_variant %></span>
+            <% } %>
+          </div>
+          <div class="done-toggle">
+            <span>Done</span>
+            <label class="switch">
+              <input type="hidden" name="done" value="0" />
+              <input type="checkbox" name="done" value="1" <%= run.done ? 'checked' : '' %> />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Measured outputs</h2>
+        <form method="POST" action="/im/<%= experiment.id %>/runs/<%= run.id %>" class="run-form" data-im-run-form data-im-run-url="/im/<%= experiment.id %>/runs/<%= run.id %>">
+          <% const defsByCode = {}; outputs.forEach((d) => { defsByCode[d.code] = d; }); %>
+          <fieldset class="param-fieldset">
+            <legend>Outputs · Core</legend>
+            <div class="run-compact-grid">
+              <% ['cycle_time','part_weight','defect_tags'].forEach((code) => { %>
+                <% const def = defsByCode[code]; if (!def) return; %>
+                <% const isTags = def.code === 'defect_tags'; %>
+                <% const fieldClass = isTags ? 'run-wide' : ''; %>
+                <label class="run-compact-field <%= fieldClass %>">
+                  <span><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></span>
+                  <% if (isTags) { %>
+                    <% const selected = (textMap.get(def.id) || '').split(',').map((v) => v.trim()).filter((v) => v); %>
+                    <div class="tag-cloud">
+                      <% (def.options || []).forEach((opt) => { %>
+                        <label class="tag-pill">
+                          <input type="checkbox" name="param_<%= def.id %>" value="<%= opt %>" <%= selected.includes(opt) ? 'checked' : '' %> />
+                          <span><%= opt %></span>
+                        </label>
+                      <% }) %>
+                    </div>
+                  <% } else { %>
+                    <input class="run-input" type="text" inputmode="decimal" name="param_<%= def.id %>" value="<%= valueMap.get(def.id) ?? '' %>" />
+                  <% } %>
+                </label>
+              <% }) %>
+            </div>
+          </fieldset>
+          <fieldset class="param-fieldset">
+            <legend>Outputs · Part</legend>
+            <div class="run-compact-grid">
+              <% ['wall_thickness','eject_temp'].forEach((code) => { %>
+                <% const def = defsByCode[code]; if (!def) return; %>
+                <label class="run-compact-field">
+                  <span><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></span>
+                  <input class="run-input" type="text" inputmode="decimal" name="param_<%= def.id %>" value="<%= valueMap.get(def.id) ?? '' %>" />
+                </label>
+              <% }) %>
+            </div>
+          </fieldset>
+          <fieldset class="param-fieldset">
+            <legend>Outputs · Shots</legend>
+            <div class="run-compact-grid">
+              <% ['shots_per_run','shots_ok','shots_scrap'].forEach((code) => { %>
+                <% const def = defsByCode[code]; if (!def) return; %>
+                <label class="run-compact-field">
+                  <span><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></span>
+                  <input class="run-input" type="text" inputmode="decimal" name="param_<%= def.id %>" value="<%= valueMap.get(def.id) ?? '' %>" />
+                </label>
+              <% }) %>
+            </div>
+          </fieldset>
+          <fieldset class="param-fieldset">
+            <legend>Outputs · Notes</legend>
+            <div class="run-compact-grid">
+              <% const notesDef = defsByCode['output_notes']; if (notesDef) { %>
+                <label class="run-compact-field run-wide">
+                  <span><%= notesDef.label %></span>
+                  <textarea name="param_<%= notesDef.id %>" rows="4"><%= textMap.get(notesDef.id) ?? '' %></textarea>
+                </label>
+              <% } %>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+
+      <div class="card run-nav">
+        <% if (prevId) { %>
+          <a class="btn secondary" href="/im/<%= experiment.id %>/runs/<%= prevId %>">Prev run</a>
+        <% } else { %>
+          <span class="muted">Prev run</span>
+        <% } %>
+        <% if (nextId) { %>
+          <a class="btn secondary" href="/im/<%= experiment.id %>/runs/<%= nextId %>">Next run</a>
+        <% } else { %>
+          <span class="muted">Next run</span>
+        <% } %>
+      </div>
+    </main>
+  </body>
+</html>

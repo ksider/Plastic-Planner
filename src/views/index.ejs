@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>DOE Planner</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Extrusion Planner</h1>
+      <%- include('partials/nav', { active: 'compounding' }) %>
+      <div class="small">Local-only, simple planning + data capture.</div>
+    </header>
+    <main>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2>Experiments</h2>
+          <a class="btn" href="/experiments/new">New Compounding Experiment</a>
+        </div>
+        <% if (experiments.length === 0) { %>
+          <p>No experiments yet. Create one.</p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Final Mass (g)</th>
+                  <th>Seed</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% experiments.forEach((exp) => { %>
+                  <tr>
+                    <td><a href="/experiments/<%= exp.id %>"><%= exp.name %></a></td>
+                    <td><%= exp.final_mass_g %></td>
+                    <td><%= exp.seed %></td>
+                    <td><%= exp.created_at %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </main>
+  </body>
+</html>

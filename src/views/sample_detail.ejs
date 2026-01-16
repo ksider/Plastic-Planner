@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title><%= sample.sample_code %></title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1><%= sample.sample_code %></h1>
+      <div class="small">
+        <%= experiment.name %> · <%= sample.recipe_name %> · <%= sample.batch_code %>
+      </div>
+      <%- include('partials/nav', { active: 'compounding' }) %>
+      <div style="margin-top:8px;">
+        <a class="btn secondary" href="/experiments/<%= experiment.id %>">Back to experiment</a>
+      </div>
+    </header>
+
+    <main class="run-page">
+      <div class="card run-hero">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <h2 style="margin:0;">Recipe / Weighing</h2>
+          <% if (sample.done) { %>
+            <span class="badge ok">DONE</span>
+          <% } %>
+        </div>
+        <div class="table-wrap">
+          <table class="weights-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Weight (g)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% weights.forEach((row) => { %>
+                <tr>
+                  <td><%= row.name %></td>
+                  <td>
+                    <div><%= formatNumber(row.grams, 2) %></div>
+                    <% if (row.phr !== null) { %>
+                      <div class="small">phr: <%= formatNumber(row.phr, 2) %></div>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+              <tr>
+                <td><strong>Total</strong></td>
+                <td><strong><%= formatNumber(sample.total_g, 2) %></strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Measured parameters</h2>
+        <form method="POST" action="/experiments/<%= experiment.id %>/samples/<%= sample.id %>" class="run-form">
+          <input type="hidden" name="redirect_to" value="/experiments/<%= experiment.id %>/samples/<%= sample.id %>" />
+          <label>
+            <span>Mold temp (C)</span>
+            <input type="number" inputmode="decimal" name="mold_temp_c" value="<%= sample.mold_temp_c ?? '' %>" />
+          </label>
+          <label>
+            <span>Solubles (%)</span>
+            <input type="number" inputmode="decimal" name="solubles_pct" value="<%= sample.solubles_pct ?? '' %>" />
+          </label>
+          <label>
+            <span>Swelling (g/g)</span>
+            <input type="number" inputmode="decimal" name="swelling_g_g" value="<%= sample.swelling_g_g ?? '' %>" />
+          </label>
+          <label>
+            <span>Density (g/cm3)</span>
+            <input type="number" inputmode="decimal" name="density_g_cm3" value="<%= sample.density_g_cm3 ?? '' %>" />
+          </label>
+          <label>
+            <span>Notes</span>
+            <textarea name="notes_mold" rows="4"><%= sample.notes_mold ?? '' %></textarea>
+          </label>
+          <div class="done-toggle">
+            <span>Done</span>
+            <label class="switch">
+              <input type="hidden" name="done" value="0" />
+              <input type="checkbox" name="done" value="1" <%= sample.done ? 'checked' : '' %> />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <button type="submit">Save</button>
+        </form>
+      </div>
+
+      <div class="card run-nav">
+        <% if (prevId) { %>
+          <a class="btn secondary" href="/experiments/<%= experiment.id %>/samples/<%= prevId %>">Prev sample</a>
+        <% } else { %>
+          <span class="muted">Prev sample</span>
+        <% } %>
+        <% if (nextId) { %>
+          <a class="btn secondary" href="/experiments/<%= experiment.id %>/samples/<%= nextId %>">Next sample</a>
+        <% } else { %>
+          <span class="muted">Next sample</span>
+        <% } %>
+      </div>
+    </main>
+  </body>
+</html>

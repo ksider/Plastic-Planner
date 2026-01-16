@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title><%= run.run_code %></title>
+    <link rel="stylesheet" href="/public/styles.css" />
+    <script defer src="/public/tps.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1><%= run.run_code %></h1>
+      <%- include('partials/nav', { active: 'tps' }) %>
+      <div class="small">
+        Recipe: <%= run.recipe_name || 'Unassigned' %>
+        <% if (run.recipe_variant) { %>
+          <span class="badge tiny"><%= run.recipe_variant %></span>
+        <% } %>
+      </div>
+      <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <a class="btn secondary" href="/tps/<%= experiment.id %>#tab-tps-runs">Back to experiment</a>
+        <% if (prevRunId) { %>
+          <a class="btn secondary" href="/tps/<%= experiment.id %>/runs/<%= prevRunId %>">Prev</a>
+        <% } %>
+        <% if (nextRunId) { %>
+          <a class="btn secondary" href="/tps/<%= experiment.id %>/runs/<%= nextRunId %>">Next</a>
+        <% } %>
+      </div>
+    </header>
+    <main>
+      <div class="card">
+        <form data-tps-run-form data-tps-run-url="/tps/<%= experiment.id %>/runs/<%= run.id %>">
+          <label class="toggle-line">
+            <input type="checkbox" name="done" value="1" <%= run.done ? 'checked' : '' %> />
+            <span>Done</span>
+          </label>
+          <% if (run.done) { %>
+            <span class="badge ok">DONE</span>
+          <% } %>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Experiment settings</h2>
+        <div class="settings-grid">
+          <div class="settings-col">
+            <div class="small">Recipe</div>
+            <div class="recipe-title">
+              <%= run.recipe_name || 'Unassigned' %>
+              <% if (run.recipe_variant) { %>
+                <span class="badge tiny"><%= run.recipe_variant %></span>
+              <% } %>
+            </div>
+            <% if (recipeParts && recipeParts.length) { %>
+              <table class="compact-table fit" style="margin-top:8px;">
+                <thead>
+                  <tr>
+                    <th>Component</th>
+                    <th>phr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% recipeParts.forEach((p) => { %>
+                    <tr>
+                      <td><%= p.name %></td>
+                      <td><%= p.parts_used %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            <% } %>
+          </div>
+          <div class="settings-col">
+            <div class="small">Process settings</div>
+            <table class="compact-table fit" style="margin-top:8px;">
+              <thead>
+                <tr>
+                  <th>Parameter</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% paramValues.forEach((p) => { %>
+                  <tr>
+                    <td><%= p.label %></td>
+                    <td><%= p.value ?? '' %><%= p.unit ? ` ${p.unit}` : '' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Measured outputs</h2>
+        <form data-tps-run-form data-tps-run-url="/tps/<%= experiment.id %>/runs/<%= run.id %>">
+          <div class="run-compact-grid">
+            <% outputFields.forEach((field) => { %>
+              <label class="run-compact-field <%= field.type === 'tags' ? 'run-wide' : '' %>">
+                <span><%= field.label %></span>
+                <% if (field.type === 'tags') { %>
+                  <select name="output__<%= field.key %>">
+                    <option value=""></option>
+                    <% (field.options || []).forEach((opt) => { %>
+                      <option value="<%= opt %>" <%= outputs[field.key] === opt ? 'selected' : '' %>><%= opt %></option>
+                    <% }) %>
+                  </select>
+                <% } else { %>
+                  <input name="output__<%= field.key %>" value="<%= outputs[field.key] ?? '' %>" />
+                <% } %>
+              </label>
+            <% }) %>
+            <label class="run-compact-field run-wide">
+              <span>Notes</span>
+              <textarea name="notes" rows="3"><%= run.notes ?? '' %></textarea>
+            </label>
+          </div>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>

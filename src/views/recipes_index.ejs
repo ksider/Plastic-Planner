@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Recipes</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Recipes</h1>
+      <%- include('partials/nav', { active: 'recipes' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2>Saved Recipes</h2>
+          <div style="display:flex; gap:8px;">
+            <a class="btn" href="/recipes/new">New Recipe</a>
+            <a class="btn secondary" href="/recipes/import-bpacks">Import from BPACKs CSV</a>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (recipes.length === 0) { %>
+                <tr>
+                  <td colspan="4">No recipes yet.</td>
+                </tr>
+              <% } %>
+              <% recipes.forEach((r) => { %>
+                <% const isImported = (r.description || '').trim().toLowerCase() === 'imported from bpacks csv'; %>
+                <tr>
+                  <td>
+                    <%= r.name %>
+                    <% if (r.has_range) { %>
+                      <span class="badge">min-max</span>
+                    <% } %>
+                    <% if (isImported) { %>
+                      <span class="badge tiny">Imported from BPACKs CSV</span>
+                    <% } %>
+                  </td>
+                  <td><%= isImported ? '' : (r.description || '') %></td>
+                  <td><%= r.created_at %></td>
+                  <td>
+                    <div style="display:flex; gap:8px;">
+                      <a class="btn secondary" href="/recipes/<%= r.id %>">Edit</a>
+                      <form method="POST" action="/recipes/<%= r.id %>/delete" onsubmit="return confirm('Delete recipe?')">
+                        <button class="btn" type="submit">Delete</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

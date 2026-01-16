@@ -1,0 +1,312 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title><%= experiment.name %></title>
+    <link rel="stylesheet" href="/public/styles.css" />
+    <script defer src="/public/app.js"></script>
+    <script defer src="/public/im.js"></script>
+    <script defer src="/public/im_analysis.js?v=2"></script>
+  </head>
+  <body>
+    <header>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <h1><%= experiment.name %></h1>
+        <form method="POST" action="/im/<%= experiment.id %>/delete" onsubmit="return confirm('Delete this IM experiment? This cannot be undone.');">
+          <button class="danger" type="submit">Delete IM experiment</button>
+        </form>
+      </div>
+      <%- include('partials/nav', { active: 'im' }) %>
+      <div class="small">ID: <%= experiment.id %> · Seed: <%= experiment.seed %></div>
+    </header>
+    <main>
+      <div class="tab-buttons">
+        <button class="active" data-tab-target="tab-im-design">Design</button>
+        <button data-tab-target="tab-im-runs">Runs</button>
+        <button data-tab-target="tab-im-analysis">Analysis</button>
+      </div>
+
+      <section id="tab-im-design" class="tab-panel active">
+        <% const paramsByCode = {}; params.forEach((p) => { paramsByCode[p.code] = p; }); %>
+        <% const extraActiveDefs = params.filter((d) => Number(d.is_output) === 0 && !coreCodes.includes(d.code) && d.config && d.config.active === 1); %>
+        <form method="POST" action="/im/<%= experiment.id %>/params" data-im-param-form data-experiment-id="<%= experiment.id %>" data-redirect="#tab-im-design">
+          <div class="im-design-layout">
+            <div>
+              <div class="card">
+                <h2>Core settings</h2>
+                <div class="table-wrap">
+                  <table class="im-params">
+                    <thead>
+                      <tr>
+                        <th>Active</th>
+                        <th>Parameter</th>
+                        <th>Mode</th>
+                        <th>Value</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% coreCodes.forEach((code) => { %>
+                        <% const def = paramsByCode[code]; if (!def) return; %>
+                        <% const cfg = def.config || {}; %>
+                        <% const hasValues = (cfg.fixed_value !== null && cfg.fixed_value !== undefined) || (cfg.range_min !== null && cfg.range_min !== undefined) || (cfg.range_max !== null && cfg.range_max !== undefined) || cfg.list_json; %>
+                        <% if (!cfg.active && !hasValues) return; %>
+                        <tr data-param-row data-param-id="<%= def.id %>" data-mode="<%= cfg.mode || 'FIXED' %>">
+                          <td>
+                            <input type="hidden" name="params[<%= def.id %>][active]" value="0" />
+                            <input type="checkbox" name="params[<%= def.id %>][active]" value="1" <%= cfg.active ? 'checked' : '' %> />
+                          </td>
+                          <td>
+                            <div><strong><%= def.label %></strong></div>
+                            <div class="small">
+                              <%= def.unit || '' %>
+                              <% if (def.min_default !== null || def.max_default !== null) { %>
+                                <span>· default: <%= formatNumber(def.min_default) %><%= def.max_default !== null && def.max_default !== def.min_default ? `–${formatNumber(def.max_default)}` : '' %></span>
+                              <% } %>
+                            </div>
+                          </td>
+                          <td>
+                            <select name="params[<%= def.id %>][mode]" data-mode-select>
+                              <option value="FIXED" <%= cfg.mode === 'FIXED' ? 'selected' : '' %>>FIXED</option>
+                              <option value="RANGE" <%= cfg.mode === 'RANGE' ? 'selected' : '' %>>RANGE</option>
+                              <option value="LIST" <%= cfg.mode === 'LIST' ? 'selected' : '' %>>LIST</option>
+                            </select>
+                          </td>
+                          <td>
+                            <div class="param-inputs">
+                              <input class="mode-fixed" data-field="fixed_value" type="text" inputmode="decimal" name="params[<%= def.id %>][fixed_value]" placeholder="Fixed" value="<%= cfg.fixed_value ?? '' %>" />
+                              <input class="mode-range" data-field="range_min" type="text" inputmode="decimal" name="params[<%= def.id %>][range_min]" placeholder="Min" value="<%= cfg.range_min ?? '' %>" />
+                              <input class="mode-range" data-field="range_max" type="text" inputmode="decimal" name="params[<%= def.id %>][range_max]" placeholder="Max" value="<%= cfg.range_max ?? '' %>" />
+                              <input class="mode-list" data-field="list_values" type="text" name="params[<%= def.id %>][list_values]" placeholder="List: 10,12,15" value="<%= def.listString || '' %>" />
+                            </div>
+                          </td>
+                          <td class="cell-actions">
+                            <button class="icon-btn danger" type="button" data-im-delete-param="/im/<%= experiment.id %>/params/<%= def.id %>/delete" aria-label="Remove setting">✕</button>
+                          </td>
+                        </tr>
+                      <% }) %>
+                      <% extraActiveDefs.forEach((def) => { %>
+                        <% const cfg = def.config || {}; %>
+                        <tr data-param-row data-param-id="<%= def.id %>" data-mode="<%= cfg.mode || 'FIXED' %>">
+                          <td>
+                            <input type="hidden" name="params[<%= def.id %>][active]" value="0" />
+                            <input type="checkbox" name="params[<%= def.id %>][active]" value="1" <%= cfg.active ? 'checked' : '' %> />
+                          </td>
+                          <td>
+                            <div><strong><%= def.label %></strong></div>
+                            <div class="small">
+                              <%= def.unit || '' %>
+                              <% if (def.min_default !== null || def.max_default !== null) { %>
+                                <span>· default: <%= formatNumber(def.min_default) %><%= def.max_default !== null && def.max_default !== def.min_default ? `–${formatNumber(def.max_default)}` : '' %></span>
+                              <% } %>
+                            </div>
+                          </td>
+                          <td>
+                            <select name="params[<%= def.id %>][mode]" data-mode-select>
+                              <option value="FIXED" <%= cfg.mode === 'FIXED' ? 'selected' : '' %>>FIXED</option>
+                              <option value="RANGE" <%= cfg.mode === 'RANGE' ? 'selected' : '' %>>RANGE</option>
+                              <option value="LIST" <%= cfg.mode === 'LIST' ? 'selected' : '' %>>LIST</option>
+                            </select>
+                          </td>
+                          <td>
+                            <div class="param-inputs">
+                              <input class="mode-fixed" data-field="fixed_value" type="text" inputmode="decimal" name="params[<%= def.id %>][fixed_value]" placeholder="Fixed" value="<%= cfg.fixed_value ?? '' %>" />
+                              <input class="mode-range" data-field="range_min" type="text" inputmode="decimal" name="params[<%= def.id %>][range_min]" placeholder="Min" value="<%= cfg.range_min ?? '' %>" />
+                              <input class="mode-range" data-field="range_max" type="text" inputmode="decimal" name="params[<%= def.id %>][range_max]" placeholder="Max" value="<%= cfg.range_max ?? '' %>" />
+                              <input class="mode-list" data-field="list_values" type="text" name="params[<%= def.id %>][list_values]" placeholder="List: 10,12,15" value="<%= def.listString || '' %>" />
+                            </div>
+                          </td>
+                          <td class="cell-actions">
+                            <button class="icon-btn danger" type="button" data-im-delete-param="/im/<%= experiment.id %>/params/<%= def.id %>/delete" aria-label="Remove setting">✕</button>
+                          </td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+                <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+                  <button type="button" class="secondary" data-open-modal="im-param-modal">Add setting</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2>Machine reference</h2>
+                <img src="/public/im-machine.jpg" alt="Injection molding machine reference" class="im-hint-image" />
+              </div>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <div class="modal" data-modal="im-param-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-card">
+          <div class="modal-header">
+            <h2>Add setting</h2>
+            <button type="button" class="icon-btn" data-close-modal="im-param-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="card">
+              <h3>Standard machine setting</h3>
+              <% if (availableAdvancedDefs.length === 0) { %>
+                <div class="note">No additional standard settings available.</div>
+              <% } else { %>
+              <form method="POST" action="/im/<%= experiment.id %>/add-param">
+                <div class="inline-grid" data-mode-inputs>
+                  <div>
+                    <label>Setting</label>
+                    <select name="param_def_id" data-standard-setting>
+                      <% availableAdvancedDefs.forEach((d) => { %>
+                        <option value="<%= d.id %>" data-min="<%= d.min_default ?? '' %>" data-max="<%= d.max_default ?? '' %>"><%= d.label %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Mode</label>
+                    <select name="mode">
+                      <option value="FIXED">FIXED</option>
+                      <option value="RANGE">MIN–MAX</option>
+                      <option value="LIST">LIST</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Fixed</label>
+                    <input class="mode-fixed" name="fixed_value" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Min</label>
+                    <input class="mode-range" name="range_min" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Max</label>
+                    <input class="mode-range" name="range_max" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>List</label>
+                    <input class="mode-list" name="list_values" placeholder="10,12,15" />
+                  </div>
+                </div>
+                <div style="margin-top:12px;">
+                  <button type="submit">Add setting</button>
+                </div>
+              </form>
+              <% } %>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <h3>Custom setting</h3>
+              <form method="POST" action="/im/<%= experiment.id %>/add-custom-param">
+                <div class="inline-grid" data-mode-inputs>
+                  <div>
+                    <label>Label</label>
+                    <input name="label" required />
+                  </div>
+                  <div>
+                    <label>Unit (optional)</label>
+                    <input name="unit" />
+                  </div>
+                  <div>
+                    <label>Mode</label>
+                    <select name="mode">
+                      <option value="FIXED">FIXED</option>
+                      <option value="RANGE">MIN–MAX</option>
+                      <option value="LIST">LIST</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Fixed</label>
+                    <input class="mode-fixed" name="fixed_value" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Min</label>
+                    <input class="mode-range" name="range_min" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>Max</label>
+                    <input class="mode-range" name="range_max" type="text" inputmode="decimal" />
+                  </div>
+                  <div>
+                    <label>List</label>
+                    <input class="mode-list" name="list_values" placeholder="10,12,15" />
+                  </div>
+                </div>
+                <div style="margin-top:12px;">
+                  <button type="submit">Add custom setting</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section id="tab-im-runs" class="tab-panel">
+        <div class="card">
+          <h2>Run Matrix</h2>
+          <% if (warning) { %>
+            <div class="note"><%= warning %></div>
+          <% } %>
+          <form method="POST" action="/im/<%= experiment.id %>/generate-runs" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;" data-recipe-count="<%= recipeVariantCount || 1 %>">
+            <div>
+              <label>Max runs</label>
+              <input name="max_runs" type="number" min="1" value="<%= maxRunsDefault || 32 %>" data-max-runs-input data-auto="1" />
+              <div class="small" data-max-runs-label></div>
+            </div>
+            <button type="submit">Generate runs</button>
+          </form>
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="secondary" data-copy-table="im-runs-table">Copy as TSV</button>
+            <a class="btn" href="/im/<%= experiment.id %>/export/runs.csv">Download CSV</a>
+          </div>
+          <div class="table-wrap">
+            <table id="im-runs-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>RunCode</th>
+                  <th>Recipe</th>
+                  <% keyDefs.forEach((def) => { %>
+                    <th><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></th>
+                  <% }) %>
+                  <th>Done</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (runs.length === 0) { %>
+                  <tr><td colspan="<%= 4 + keyDefs.length %>">No runs yet.</td></tr>
+                <% } %>
+                <% runs.forEach((run) => { %>
+                  <tr class="<%= run.done ? 'row-done' : '' %>">
+                    <td><%= run.run_order %></td>
+                    <td>
+                      <a href="/im/<%= experiment.id %>/runs/<%= run.id %>"><%= run.run_code %></a>
+                      <% if (run.done) { %>
+                        <span class="badge ok">DONE</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <%= run.recipe_name || '' %>
+                      <% if (run.recipe_variant) { %>
+                        <span class="badge tiny"><%= run.recipe_variant %></span>
+                      <% } %>
+                    </td>
+                    <% keyDefs.forEach((def) => { %>
+                      <td><%= formatNumber(run.keyValues[def.code]) %></td>
+                    <% }) %>
+                    <td><%= run.done ? 'Yes' : 'No' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-im-analysis" class="tab-panel">
+        <div class="card">
+          <h2>Analysis</h2>
+          <div id="im-analysis" data-analysis-endpoint="/im/<%= experiment.id %>/analysis.json"></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

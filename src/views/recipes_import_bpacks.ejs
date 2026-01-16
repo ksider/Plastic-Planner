@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Import from BPACKs CSV</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Import from BPACKs CSV</h1>
+      <%- include('partials/nav', { active: 'recipes' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <% if (error) { %>
+          <div class="note"><%= error %></div>
+        <% } %>
+        <form method="POST" action="/recipes/import-bpacks" enctype="multipart/form-data">
+          <div class="field">
+            <label for="bpacks_file">BPACKs CSV file</label>
+            <input id="bpacks_file" type="file" name="bpacks_file" accept=".csv,text/csv" required />
+          </div>
+          <button class="btn" type="submit">Preview import</button>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>

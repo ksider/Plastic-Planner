@@ -1,0 +1,10 @@
+node_modules
+/dist
+doe.sqlite
+.DS_Store
+Thumbs.db
+.env
+.env.*
+.npm
+.pnpm-store
+.yarn

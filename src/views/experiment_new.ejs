@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>New Experiment</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+    <script defer src="/public/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>New Experiment</h1>
+      <%- include('partials/nav', { active: 'compounding' }) %>
+    </header>
+    <main>
+      <div class="card">
+        <form method="POST" action="/experiments" data-experiment-form>
+          <div class="inline-grid">
+            <div>
+              <label>Experiment name</label>
+              <input name="name" required />
+            </div>
+            <div>
+              <label>Final batch mass (g)</label>
+              <input name="final_mass_g" type="number" step="1" value="1500" required />
+            </div>
+            <div>
+              <label>Total compounding runs (even)</label>
+              <input name="total_runs" type="number" step="1" value="8" required data-auto-total-runs="1" />
+              <div class="small" data-total-runs-hint></div>
+            </div>
+            <div>
+              <label>Random seed (optional)</label>
+              <input name="seed" />
+            </div>
+            <div>
+              <label>Mold temps (C, comma-separated)</label>
+              <input name="mold_temps" value="40,80,120" />
+            </div>
+            <div>
+              <label>Head temps (C, comma-separated)</label>
+              <input name="head_temps" value="90, 100" />
+            </div>
+            <div>
+              <label>Replicates per temp</label>
+              <input name="replicates_per_temp" type="number" step="1" value="1" required />
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px;">
+            <h3>Select Recipes</h3>
+            <div class="recipe-select-list" data-recipe-list>
+              <% recipes.forEach((r) => { %>
+                <% const descText = (r.description || '').trim(); %>
+                <% const isImported = descText.toLowerCase() === 'imported from bpacks csv'; %>
+                <button type="button" class="recipe-pill" data-recipe-pill>
+                  <input type="checkbox" name="recipe_ids" value="<%= r.id %>" data-has-range="<%= r.has_range ? '1' : '0' %>" data-variant-count="<%= r.range_count ? Math.pow(2, r.range_count) : 1 %>" />
+                  <span><%= r.name %></span>
+                  <% if (r.has_range) { %>
+                    <span class="badge">min-max</span>
+                  <% } %>
+                  <% if (isImported) { %>
+                    <span class="badge tiny">Imported from BPACKs CSV</span>
+                  <% } else if (descText) { %>
+                    <span class="badge tiny" title="<%= descText %>"><%= descText %></span>
+                  <% } %>
+                </button>
+              <% }) %>
+            </div>
+          </div>
+          <button type="submit" style="margin-top:12px;" data-generate-btn disabled>Generate Table A</button>
+          <div class="small" style="margin-top:6px;" data-recipe-hint>Select at least two recipes, or one recipe that has min-max.</div>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>
