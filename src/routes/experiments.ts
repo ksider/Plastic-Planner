@@ -18,6 +18,7 @@ import {
   parseSampleFields,
   uniqueFieldKey,
 } from "../domain/experiments.js";
+import { recipeComponentSearchText } from "../domain/recipes.js";
 import { createExperimentWithBatches, generateMoldingSamples } from "../services/experiments_service.js";
 import { parseNumber, toCsv } from "../utils.js";
 import {
@@ -45,6 +46,7 @@ import {
   listSamplesExtraByExperiment,
   listTableARows,
   listTableBRows,
+  getRecipeComponentsByIds,
   updateBatchDone,
   updateBatchFieldsPartial,
   updateExperimentFields,
@@ -59,16 +61,41 @@ import {
 export function createExperimentsRouter(db: Database) {
   const router = express.Router();
   router.get(
-  "/experiments/new",
-  wrap(async (req, res) => {
-    const recipes = await listRecipesForExperimentNew(db);
-    res.render("experiment_new", { recipes });
-  })
-);
+    "/experiments",
+    wrap(async (_req, res) => {
+      const experiments = await db.all(
+        "SELECT id, name, final_mass_g, seed, notes, created_at FROM experiments ORDER BY created_at DESC"
+      );
+      res.render("experiments_index", { experiments });
+    })
+  );
+  router.get(
+    "/experiments/new",
+    wrap(async (req, res) => {
+      const recipes = await listRecipesForExperimentNew(db);
+      const recipeIds = recipes.map((r: any) => r.id);
+      const components = recipeIds.length
+        ? await getRecipeComponentsByIds(db, recipeIds)
+        : [];
+      const componentsByRecipe = new Map<number, any[]>();
+      for (const row of components) {
+        const list = componentsByRecipe.get(row.recipe_id) ?? [];
+        list.push(row);
+        componentsByRecipe.set(row.recipe_id, list);
+      }
+      const recipesWithComponents = recipes.map((r: any) => ({
+        ...r,
+        component_search: recipeComponentSearchText(
+          componentsByRecipe.get(r.id) ?? []
+        ),
+      }));
+      res.render("experiment_new", { recipes: recipesWithComponents });
+    })
+  );
 
   router.post(
-  "/experiments",
-  wrap(async (req, res) => {
+    "/experiments",
+    wrap(async (req, res) => {
     const name = String(req.body.name || "").trim();
     const finalMass = Number(req.body.final_mass_g || 1500);
     const recipeIds = Array.isArray(req.body.recipe_ids)
@@ -76,6 +103,7 @@ export function createExperimentsRouter(db: Database) {
       : [Number(req.body.recipe_ids)].filter((n) => Number.isFinite(n));
     const totalRuns = Number(req.body.total_runs);
     const seedInput = String(req.body.seed || "").trim();
+    const notes = String(req.body.notes || "").trim() || null;
     const moldTemps = parseMoldTemps(
       String(req.body.mold_temps || "40,80,120")
     );
@@ -124,6 +152,7 @@ export function createExperimentsRouter(db: Database) {
       headTempsJson,
       headTemps,
       replicates,
+      notes,
     });
 
     res.redirect(`/experiments/${experimentId}`);
@@ -777,6 +806,30 @@ export function createExperimentsRouter(db: Database) {
     })
   );
 
+  router.post(
+    "/experiments/:id/update",
+    wrap(async (req, res) => {
+      const experimentId = Number(req.params.id);
+      const name = String(req.body.name || "").trim();
+      const seed = Number(req.body.seed);
+
+      if (!name || !Number.isFinite(seed)) {
+        throw new AppError({
+          status: 400,
+          code: "INVALID_INPUT",
+          message: "Invalid experiment inputs",
+        });
+      }
+
+      const notes = String(req.body.notes || "").trim() || null;
+      await db.run(
+        "UPDATE experiments SET name = ?, seed = ?, notes = ? WHERE id = ?",
+        [name, seed, notes, experimentId]
+      );
+
+      res.redirect(`/experiments/${experimentId}`);
+    })
+  );
+
   return router;
 }
-

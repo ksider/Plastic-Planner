@@ -128,6 +128,8 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupModals();
   setupInlineEdits();
+  setupBackLinks();
+  setupRecipeSelectSearch();
   setupRecipeComponents();
   setupRecipePaste();
   setupRecipeList();
@@ -138,6 +140,45 @@ document.addEventListener("DOMContentLoaded", () => {
   setupFieldModal();
   updateAnalysisMetricBlocks();
 });
+
+function setupBackLinks() {
+  const links = document.querySelectorAll("[data-back-link]");
+  if (!links.length) return;
+  const path = window.location.pathname.replace(/\/+$/, "");
+  const parts = path.split("/").filter(Boolean);
+  const backPath = parts.length > 1 ? `/${parts.slice(0, -1).join("/")}` : "/";
+  links.forEach((link) => {
+    link.setAttribute("href", backPath);
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      window.location.href = backPath;
+    });
+  });
+}
+
+function setupRecipeSelectSearch() {
+  document.querySelectorAll("[data-recipe-select]").forEach((wrapper) => {
+    const input = wrapper.querySelector("[data-recipe-select-search]");
+    if (!input) return;
+    const cards = Array.from(wrapper.querySelectorAll(".recipe-select-card"));
+    if (!cards.length) return;
+    const runFilter = () => {
+      const query = (input.value || "").trim().toLowerCase();
+      if (!query) {
+        cards.forEach((card) => {
+          card.style.display = "";
+        });
+        return;
+      }
+      cards.forEach((card) => {
+        const hay = (card.getAttribute("data-recipe-text") || "").toLowerCase();
+        card.style.display = hay.includes(query) ? "" : "none";
+      });
+    };
+    input.addEventListener("input", runFilter);
+    input.addEventListener("search", runFilter);
+  });
+}
 
 function updateComponentRow(row) {
   const toggle = row.querySelector("[data-mode-toggle]");
@@ -222,7 +263,6 @@ function setupRecipeComponents() {
     if (!button) return;
     const row = button.closest(".component-row");
     if (!row) return;
-    if (row.getAttribute("data-locked") === "1") return;
     const removeFlag = row.querySelector("[data-remove-flag]");
     if (removeFlag) removeFlag.value = "1";
     row.classList.add("hidden");
@@ -310,9 +350,6 @@ function setupRecipePaste() {
         table.querySelectorAll(".component-row")
       );
       const byName = new Map();
-      const lockedRow = existingRows.find(
-        (row) => row.getAttribute("data-locked") === "1"
-      );
       existingRows.forEach((row) => {
         const nameInputEl = row.querySelector("input[name$='[name]']");
         if (nameInputEl && nameInputEl.value.trim()) {
@@ -346,20 +383,6 @@ function setupRecipePaste() {
           if (maxInput) maxInput.value = maxVal;
           if (toggle) toggle.checked = mode === "range";
           updateComponentRow(existing);
-        } else if (
-          lockedRow &&
-          (comp.toLowerCase().includes("starch") ||
-            (!rangeMatch && Number(value) === 100))
-        ) {
-          const staticInput = lockedRow.querySelector("[data-mode-static]");
-          const minInput = lockedRow.querySelector("[data-mode-min]");
-          const maxInput = lockedRow.querySelector("[data-mode-max]");
-          const toggle = lockedRow.querySelector("[data-mode-toggle]");
-          if (staticInput) staticInput.value = staticVal;
-          if (minInput) minInput.value = minVal;
-          if (maxInput) maxInput.value = maxVal;
-          if (toggle) toggle.checked = mode === "range";
-          updateComponentRow(lockedRow);
         } else {
           addRow(comp, staticVal, mode, minVal, maxVal);
         }

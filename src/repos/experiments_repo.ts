@@ -25,11 +25,12 @@ export async function insertExperiment(
   headTempsJson: string,
   sampleFieldsJson: string,
   analysisMetricKeysJson: string,
-  replicates: number
+  replicates: number,
+  notes: string | null
 ) {
   return db.run(
-    `INSERT INTO experiments (name, final_mass_g, seed, mold_temps_json, head_temps_json, sample_fields_json, analysis_metric_keys_json, replicates_per_temp)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO experiments (name, final_mass_g, seed, mold_temps_json, head_temps_json, sample_fields_json, analysis_metric_keys_json, replicates_per_temp, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       name,
       finalMass,
@@ -39,6 +40,7 @@ export async function insertExperiment(
       sampleFieldsJson,
       analysisMetricKeysJson,
       replicates,
+      notes,
     ]
   );
 }

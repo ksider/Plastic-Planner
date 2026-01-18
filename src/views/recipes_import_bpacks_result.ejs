@@ -4,10 +4,14 @@
     <meta charset="utf-8" />
     <title>Import Result</title>
     <link rel="stylesheet" href="/public/styles.css" />
+    <script defer src="/public/app.js"></script>
   </head>
   <body>
     <header>
-      <h1>Import Result</h1>
+      <div class="header-line">
+        <a class="back-link" href="#" data-back-link>←</a>
+        <h1>Import Result</h1>
+      </div>
       <%- include('partials/nav', { active: 'recipes' }) %>
     </header>
     <main>

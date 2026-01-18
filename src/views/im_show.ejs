@@ -4,22 +4,54 @@
     <meta charset="utf-8" />
     <title><%= experiment.name %></title>
     <link rel="stylesheet" href="/public/styles.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
     <script defer src="/public/app.js"></script>
     <script defer src="/public/im.js"></script>
     <script defer src="/public/im_analysis.js?v=2"></script>
   </head>
   <body>
     <header>
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div class="header-line">
+        <a class="back-link" href="#" data-back-link>←</a>
         <h1><%= experiment.name %></h1>
-        <form method="POST" action="/im/<%= experiment.id %>/delete" onsubmit="return confirm('Delete this IM experiment? This cannot be undone.');">
-          <button class="danger" type="submit">Delete IM experiment</button>
-        </form>
+        <button type="button" class="icon-btn" data-open-modal="im-details-modal" title="Edit experiment" aria-label="Edit experiment">
+          <span class="material-symbols-outlined">edit</span>
+        </button>
       </div>
       <%- include('partials/nav', { active: 'im' }) %>
       <div class="small">ID: <%= experiment.id %> · Seed: <%= experiment.seed %></div>
+      <form method="POST" action="/im/<%= experiment.id %>/delete" onsubmit="return confirm('Delete this IM experiment? This cannot be undone.');" style="margin-top:8px;">
+        <button class="btn secondary" type="submit">Delete IM experiment</button>
+      </form>
     </header>
     <main>
+      <div class="modal" data-modal="im-details-modal">
+        <div class="modal-backdrop" data-close-modal="im-details-modal"></div>
+        <div class="modal-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0;">Edit experiment</h3>
+            <button type="button" class="icon-btn" data-close-modal="im-details-modal" aria-label="Close">✕</button>
+          </div>
+          <form method="POST" action="/im/<%= experiment.id %>/update" class="inline-grid" style="margin-top:12px;">
+            <div>
+              <label>Name</label>
+              <input name="name" value="<%= experiment.name %>" required />
+            </div>
+            <div>
+              <label>Seed</label>
+              <input name="seed" type="number" inputmode="numeric" value="<%= experiment.seed %>" required />
+            </div>
+            <div style="grid-column:1/-1;">
+              <label>Notes</label>
+              <textarea name="notes" rows="2"><%= experiment.notes || '' %></textarea>
+            </div>
+            <div style="align-self:end; display:flex; gap:8px;">
+              <button type="button" class="secondary" data-close-modal="im-details-modal">Cancel</button>
+              <button type="submit">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
       <div class="tab-buttons">
         <button class="active" data-tab-target="tab-im-design">Design</button>
         <button data-tab-target="tab-im-runs">Runs</button>

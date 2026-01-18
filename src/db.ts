@@ -33,6 +33,7 @@ async function init(): Promise<Database> {
       analysis_metric_key TEXT NOT NULL DEFAULT 'solubles_pct',
       analysis_metric_keys_json TEXT NOT NULL DEFAULT '["solubles_pct"]',
       replicates_per_temp INTEGER NOT NULL,
+      notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -247,6 +248,74 @@ async function init(): Promise<Database> {
   `);
 
   await db.exec(`
+    CREATE TABLE IF NOT EXISTS extrusion_param_definitions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      unit TEXT,
+      min_default REAL,
+      max_default REAL,
+      is_default INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS extrusion_experiments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      seed INTEGER NOT NULL,
+      notes TEXT,
+      output_fields_json TEXT NOT NULL DEFAULT '[]',
+      analysis_metric_keys_json TEXT NOT NULL DEFAULT '["shear_rate_s"]',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS extrusion_experiment_recipes (
+      experiment_id INTEGER NOT NULL,
+      recipe_id INTEGER NOT NULL,
+      PRIMARY KEY (experiment_id, recipe_id),
+      FOREIGN KEY (experiment_id) REFERENCES extrusion_experiments(id),
+      FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS extrusion_param_configs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      experiment_id INTEGER NOT NULL,
+      param_def_id INTEGER NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'FIXED',
+      fixed_value REAL,
+      range_min REAL,
+      range_max REAL,
+      list_json TEXT,
+      active INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (experiment_id) REFERENCES extrusion_experiments(id),
+      FOREIGN KEY (param_def_id) REFERENCES extrusion_param_definitions(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS extrusion_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      experiment_id INTEGER NOT NULL,
+      run_order INTEGER NOT NULL,
+      run_code TEXT NOT NULL,
+      recipe_id INTEGER,
+      recipe_variant TEXT,
+      done INTEGER NOT NULL DEFAULT 0,
+      outputs_json TEXT NOT NULL DEFAULT '{}',
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (experiment_id) REFERENCES extrusion_experiments(id),
+      FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS extrusion_run_param_values (
+      run_id INTEGER NOT NULL,
+      param_def_id INTEGER NOT NULL,
+      value_real REAL,
+      PRIMARY KEY (run_id, param_def_id),
+      FOREIGN KEY (run_id) REFERENCES extrusion_runs(id),
+      FOREIGN KEY (param_def_id) REFERENCES extrusion_param_definitions(id)
+    );
+  `);
+
+  await db.exec(`
     DELETE FROM im_param_configs
     WHERE id NOT IN (
       SELECT MAX(id)
@@ -261,6 +330,10 @@ async function init(): Promise<Database> {
 
   await db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS tps_param_configs_unique ON tps_param_configs (experiment_id, param_def_id)"
+  );
+
+  await db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS extrusion_param_configs_unique ON extrusion_param_configs (experiment_id, param_def_id)"
   );
 
   const batchColumns = await db.all<{ name: string }>(
@@ -305,6 +378,9 @@ async function init(): Promise<Database> {
     await db.exec(
       "ALTER TABLE experiments ADD COLUMN analysis_metric_keys_json TEXT NOT NULL DEFAULT '[\"solubles_pct\"]'"
     );
+  }
+  if (!experimentColumnNames.has("notes")) {
+    await db.exec("ALTER TABLE experiments ADD COLUMN notes TEXT");
   }
 
   const sampleColumns = await db.all<{ name: string }>(
@@ -651,6 +727,52 @@ async function init(): Promise<Database> {
       if (existing) continue;
       await db.run(
         `INSERT INTO tps_param_definitions
+         (code, label, unit, min_default, max_default, is_default)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [p[0], p[1], p[2], p[3], p[4], p[5]]
+      );
+    }
+  }
+
+  const extrusionParamCount = (await db.get<{ count: number }>(
+    "SELECT COUNT(*) as count FROM extrusion_param_definitions"
+  )) ?? { count: 0 };
+
+  const extrusionParams: Array<
+    [string, string, string, number | null, number | null, number]
+  > = [
+      ["pellet_weight_g", "Pellet weight", "g", 5, 10, 1],
+      ["pellet_moisture_pct", "Pellet moisture", "%", 0.5, 2, 1],
+      ["cylinder_temp_c", "Cylinder temperature", "°C", 160, 200, 1],
+      ["pressure_bar", "Hydraulic pressure", "bar", 4, 6, 1],
+      ["hold_time_s", "Hold time", "s", 30, 120, 1],
+      ["piston_diameter_mm", "Piston diameter", "mm", 35, 35, 1],
+      ["nozzle_diameter_mm", "Nozzle diameter", "mm", 5, 5, 1],
+      ["nozzle_length_mm", "Nozzle length (hot)", "mm", 5, 5, 1],
+      ["cold_capillary_diameter_mm", "Cold capillary diameter", "mm", 8, 8, 1],
+      ["cold_capillary_length_mm", "Cold capillary length", "mm", 19.5, 19.5, 1],
+      ["wheel_diameter_mm", "Wheel diameter", "mm", 33, 33, 1],
+      ["pressure_coeff_kp", "Pressure coefficient kP", "", 1, 1, 1],
+    ];
+
+  if (extrusionParamCount.count === 0) {
+    for (const p of extrusionParams) {
+      await db.run(
+        `INSERT INTO extrusion_param_definitions
+         (code, label, unit, min_default, max_default, is_default)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [p[0], p[1], p[2], p[3], p[4], p[5]]
+      );
+    }
+  } else {
+    for (const p of extrusionParams) {
+      const existing = await db.get(
+        "SELECT id FROM extrusion_param_definitions WHERE code = ?",
+        [p[0]]
+      );
+      if (existing) continue;
+      await db.run(
+        `INSERT INTO extrusion_param_definitions
          (code, label, unit, min_default, max_default, is_default)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [p[0], p[1], p[2], p[3], p[4], p[5]]

@@ -5,10 +5,14 @@
     <title>New IM Experiment</title>
     <link rel="stylesheet" href="/public/styles.css" />
     <script defer src="/public/im.js"></script>
+    <script defer src="/public/app.js"></script>
   </head>
   <body>
     <header>
-      <h1>New IM Experiment</h1>
+      <div class="header-line">
+        <a class="back-link" href="#" data-back-link>←</a>
+        <h1>New IM Experiment</h1>
+      </div>
       <%- include('partials/nav', { active: 'im' }) %>
     </header>
     <main>
@@ -41,23 +45,7 @@
             </div>
           </div>
 
-          <div class="card" style="margin-top:16px;">
-            <h3>Recipes for this experiment</h3>
-            <% if (recipes.length === 0) { %>
-              <div class="note">No recipes yet. Create recipes first.</div>
-            <% } %>
-            <div class="recipe-select-list" data-recipe-list>
-              <% recipes.forEach((r) => { %>
-                <button type="button" class="recipe-pill" data-recipe-pill>
-                  <input type="checkbox" name="recipe_ids" value="<%= r.id %>" />
-                  <span><%= r.name %></span>
-                  <% if (r.has_range) { %>
-                    <span class="badge">min-max</span>
-                  <% } %>
-                </button>
-              <% }) %>
-            </div>
-          </div>
+          <%- include('partials/recipe_select', { recipes, title: 'Recipes for this experiment' }) %>
 
           <div style="margin-top:12px;">
             <button type="submit">Create IM Experiment</button>

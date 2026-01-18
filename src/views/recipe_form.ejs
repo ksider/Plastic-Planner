@@ -9,7 +9,10 @@
   </head>
   <body>
     <header>
-      <h1><%= recipe ? 'Edit Recipe' : 'New Recipe' %></h1>
+      <div class="header-line">
+        <a class="back-link" href="#" data-back-link>←</a>
+        <h1><%= recipe ? 'Edit Recipe' : 'New Recipe' %></h1>
+      </div>
       <%- include('partials/nav', { active: 'recipes' }) %>
     </header>
     <main>
@@ -48,9 +51,9 @@
                 </thead>
                 <tbody>
                   <% components.forEach((c, idx) => { %>
-                    <tr class="component-row" data-locked="<%= c.is_locked %>">
+                    <tr class="component-row" data-locked="0">
                       <td>
-                        <input name="components[<%= idx %>][name]" value="<%= c.name %>" <%= c.is_locked ? 'readonly' : '' %> />
+                        <input name="components[<%= idx %>][name]" value="<%= c.name %>" />
                       </td>
                       <td>
                         <div style="display:flex; align-items:center; gap:8px;">
@@ -72,12 +75,12 @@
                         <input name="components[<%= idx %>][parts_max]" type="number" step="0.1" value="<%= c.parts_max ?? '' %>" data-mode-max />
                       </td>
                       <td>
-                        <button type="button" class="icon-btn" data-remove-component title="Remove" <%= c.is_locked ? 'disabled' : '' %>>
+                        <button type="button" class="icon-btn" data-remove-component title="Remove">
                           <span class="material-symbols-outlined">close</span>
                         </button>
                         <input type="hidden" name="components[<%= idx %>][id]" value="<%= c.id ?? '' %>" />
                         <input type="hidden" name="components[<%= idx %>][remove]" value="0" data-remove-flag />
-                        <input type="hidden" name="components[<%= idx %>][is_locked]" value="<%= c.is_locked %>" />
+                        <input type="hidden" name="components[<%= idx %>][is_locked]" value="0" />
                       </td>
                     </tr>
                   <% }) %>

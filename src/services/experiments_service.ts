@@ -28,6 +28,7 @@ export async function createExperimentWithBatches(
     headTempsJson: string;
     headTemps: number[];
     replicates: number;
+    notes: string | null;
   }
 ) {
   const {
@@ -40,6 +41,7 @@ export async function createExperimentWithBatches(
     headTempsJson,
     headTemps,
     replicates,
+    notes,
   } = input;
 
   const recipes = await getRecipesByIds(db, recipeIds);
@@ -168,7 +170,8 @@ export async function createExperimentWithBatches(
       headTempsJson,
       JSON.stringify(defaultSampleFields()),
       JSON.stringify(["solubles_pct"]),
-      replicates
+      replicates,
+      notes
     );
     experimentId = expResult.lastID as number;
 

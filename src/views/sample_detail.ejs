@@ -4,10 +4,14 @@
     <meta charset="utf-8" />
     <title><%= sample.sample_code %></title>
     <link rel="stylesheet" href="/public/styles.css" />
+    <script defer src="/public/app.js"></script>
   </head>
   <body>
     <header>
-      <h1><%= sample.sample_code %></h1>
+      <div class="header-line">
+        <a class="back-link" href="#" data-back-link>←</a>
+        <h1><%= sample.sample_code %></h1>
+      </div>
       <div class="small">
         <%= experiment.name %> · <%= sample.recipe_name %> · <%= sample.batch_code %>
       </div>

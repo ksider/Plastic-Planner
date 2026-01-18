@@ -1,6 +1,11 @@
-<nav>
-  <a href="/" class="<%= active === 'compounding' ? 'active' : '' %>">Compounding</a>
-  <a href="/tps" class="<%= active === 'tps' ? 'active' : '' %>">WET Mixing</a>
-  <a href="/im" class="<%= active === 'im' ? 'active' : '' %>">Injection Molding</a>
-  <a href="/recipes" class="<%= active === 'recipes' ? 'active' : '' %>">Recipes</a>
+<nav class="main-nav">
+  <div class="nav-left">
+    <a href="/experiments" class="<%= active === 'compounding' ? 'active' : '' %>">Compounding</a>
+    <a href="/tps" class="<%= active === 'tps' ? 'active' : '' %>">WET Mixing</a>
+    <a href="/im" class="<%= active === 'im' ? 'active' : '' %>">Injection Molding</a>
+    <a href="/extrusion" class="<%= active === 'extrusion' ? 'active' : '' %>">Extrusion Flow</a>
+  </div>
+  <div class="nav-right">
+    <a href="/recipes" class="<%= active === 'recipes' ? 'active' : '' %>">Recipes</a>
+  </div>
 </nav>

@@ -2,47 +2,53 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>DOE Planner</title>
+    <title>Planner</title>
     <link rel="stylesheet" href="/public/styles.css" />
   </head>
   <body>
     <header>
-      <h1>Extrusion Planner</h1>
+      <h1>Planner</h1>
       <%- include('partials/nav', { active: 'compounding' }) %>
       <div class="small">Local-only, simple planning + data capture.</div>
     </header>
     <main>
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h2>Experiments</h2>
-          <a class="btn" href="/experiments/new">New Compounding Experiment</a>
-        </div>
-        <% if (experiments.length === 0) { %>
-          <p>No experiments yet. Create one.</p>
-        <% } else { %>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Final Mass (g)</th>
-                  <th>Seed</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% experiments.forEach((exp) => { %>
-                  <tr>
-                    <td><a href="/experiments/<%= exp.id %>"><%= exp.name %></a></td>
-                    <td><%= exp.final_mass_g %></td>
-                    <td><%= exp.seed %></td>
-                    <td><%= exp.created_at %></td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
+      <div class="experiment-card-grid">
+        <div class="card experiment-card">
+          <h3>Compounding</h3>
+          <div class="small">Planned batches, head/mold temps, and material outputs.</div>
+          <div class="small">Explore how formulation + process affect solubles and swelling.</div>
+          <div class="small">Experiments: <%= counts.compounding %></div>
+          <div style="margin-top:10px;">
+            <a class="btn" href="/experiments/new">New Compounding Experiment</a>
           </div>
-        <% } %>
+        </div>
+        <div class="card experiment-card">
+          <h3>WET Mixing</h3>
+          <div class="small">Mixing temperature/time/speed with recipe variants.</div>
+          <div class="small">Analyze solubility, moisture absorption, and texture tags.</div>
+          <div class="small">Experiments: <%= counts.tps %></div>
+          <div style="margin-top:10px;">
+            <a class="btn" href="/tps/new">New WET Mixing Experiment</a>
+          </div>
+        </div>
+        <div class="card experiment-card">
+          <h3>Injection Molding</h3>
+          <div class="small">Process window and material properties per recipe.</div>
+          <div class="small">Track temperatures, pressures, and output quality.</div>
+          <div class="small">Experiments: <%= counts.im %></div>
+          <div style="margin-top:10px;">
+            <a class="btn" href="/im/new">New Injection Molding Experiment</a>
+          </div>
+        </div>
+        <div class="card experiment-card">
+          <h3>Extrusion Flow</h3>
+          <div class="small">Plunger-capillary rheology from RPM + pressure.</div>
+          <div class="small">Compute shear rate, shear stress, and viscosity.</div>
+          <div class="small">Experiments: <%= counts.extrusion %></div>
+          <div style="margin-top:10px;">
+            <a class="btn" href="/extrusion/new">New Extrusion Experiment</a>
+          </div>
+        </div>
       </div>
     </main>
   </body>

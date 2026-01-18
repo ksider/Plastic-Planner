@@ -15,7 +15,10 @@ import {
 import { mean, sd, slugify, toCsv } from "../utils.js";
 import type { ImParamDef } from "../types.js";
 import { createImExperiment, generateImRuns } from "../services/im_service.js";
-import { buildRecipeVariantsFromComponents } from "../domain/recipes.js";
+import {
+  buildRecipeVariantsFromComponents,
+  recipeComponentSearchText,
+} from "../domain/recipes.js";
 import { getRecipeComponentsByIds } from "../repos/experiments_repo.js";
 import {
   deactivateImParamConfig,
@@ -75,7 +78,23 @@ export function createImRouter(db: Database) {
   wrap(async (req, res) => {
     const profiles = await listImMachineProfiles(db);
     const recipes = await listRecipeNames(db);
-    res.render("im_new", { profiles, recipes });
+    const recipeIds = recipes.map((r: any) => r.id);
+    const components = recipeIds.length
+      ? await getRecipeComponentsByIds(db, recipeIds)
+      : [];
+    const componentsByRecipe = new Map<number, any[]>();
+    for (const row of components) {
+      const list = componentsByRecipe.get(row.recipe_id) ?? [];
+      list.push(row);
+      componentsByRecipe.set(row.recipe_id, list);
+    }
+    const recipesWithComponents = recipes.map((r: any) => ({
+      ...r,
+      component_search: recipeComponentSearchText(
+        componentsByRecipe.get(r.id) ?? []
+      ),
+    }));
+    res.render("im_new", { profiles, recipes: recipesWithComponents });
   })
 );
 
@@ -115,6 +134,31 @@ export function createImRouter(db: Database) {
     res.redirect(`/im/${experimentId}`);
   })
 );
+
+  router.post(
+    "/im/:id/update",
+    wrap(async (req, res) => {
+      const experimentId = Number(req.params.id);
+      const name = String(req.body.name || "").trim();
+      const seed = Number(req.body.seed);
+      const notes = String(req.body.notes || "").trim() || null;
+
+      if (!name || !Number.isFinite(seed)) {
+        throw new AppError({
+          status: 400,
+          code: "INVALID_INPUT",
+          message: "Invalid IM experiment inputs",
+        });
+      }
+
+      await db.run(
+        "UPDATE im_experiments SET name = ?, seed = ?, notes = ? WHERE id = ?",
+        [name, seed, notes, experimentId]
+      );
+
+      res.redirect(`/im/${experimentId}`);
+    })
+  );
 
   router.get(
   "/im/:id",

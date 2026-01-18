@@ -1,0 +1,37 @@
+<div class="card" style="margin-top:16px;" data-recipe-select>
+  <div class="recipe-select-toolbar">
+    <h3><%= typeof title === 'string' ? title : 'Select Recipes' %></h3>
+    <input type="search" class="recipe-select-search" placeholder="Search recipes..." data-recipe-select-search />
+  </div>
+  <% const showEmptyNote = typeof emptyNote === 'undefined' ? true : emptyNote !== false; %>
+  <% const includeRangeCount = typeof includeRangeCountData === 'undefined' ? false : includeRangeCountData; %>
+  <% const showDesc = typeof showDescriptions === 'undefined' ? true : showDescriptions; %>
+  <% if (showEmptyNote && recipes.length === 0) { %>
+    <div class="note">No recipes yet. Create recipes first.</div>
+  <% } %>
+  <div class="recipe-select-grid" data-recipe-list>
+    <% recipes.forEach((r) => { %>
+      <% const descText = (r.description || '').trim(); %>
+      <% const componentText = (r.component_search || '').trim(); %>
+      <% const isImported = descText.toLowerCase() === 'imported from bpacks csv'; %>
+      <button type="button" class="recipe-select-card" data-recipe-pill data-recipe-text="<%= [r.name, descText, componentText].join(' ').toLowerCase() %>">
+        <input type="checkbox" name="recipe_ids" value="<%= r.id %>" data-has-range="<%= r.has_range ? '1' : '0' %>" <%= includeRangeCount ? `data-variant-count=\"${r.range_count ? Math.pow(2, r.range_count) : 1}\"` : '' %> />
+        <div class="recipe-select-header">
+          <div class="recipe-select-title"><%= r.name %></div>
+          <div class="recipe-select-badges">
+            <% if (r.has_range) { %>
+              <span class="badge">min-max</span>
+            <% } %>
+            <% if (showDesc && isImported) { %>
+              <span class="badge tiny">Imported</span>
+            <% } %>
+          </div>
+        </div>
+        <% if (showDesc && descText) { %>
+          <div class="recipe-select-desc" title="<%= descText %>"><%= descText %></div>
+        <% } %>
+        <span class="recipe-select-hidden" aria-hidden="true"><%= [r.name, descText, componentText].join(' ') %></span>
+      </button>
+    <% }) %>
+  </div>
+</div>

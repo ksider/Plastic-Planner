@@ -7,11 +7,27 @@ export function createIndexRouter(db: Database) {
 
   router.get(
     "/",
-    wrap(async (req, res) => {
-      const experiments = await db.all(
-        "SELECT id, name, final_mass_g, seed, created_at FROM experiments ORDER BY created_at DESC"
-      );
-      res.render("index", { experiments });
+    wrap(async (_req, res) => {
+      const [
+        compoundingCount,
+        tpsCount,
+        imCount,
+        extrusionCount,
+      ] = await Promise.all([
+        db.get("SELECT COUNT(*) as count FROM experiments"),
+        db.get("SELECT COUNT(*) as count FROM tps_experiments"),
+        db.get("SELECT COUNT(*) as count FROM im_experiments"),
+        db.get("SELECT COUNT(*) as count FROM extrusion_experiments"),
+      ]);
+
+      res.render("index", {
+        counts: {
+          compounding: compoundingCount?.count ?? 0,
+          tps: tpsCount?.count ?? 0,
+          im: imCount?.count ?? 0,
+          extrusion: extrusionCount?.count ?? 0,
+        },
+      });
     })
   );
 

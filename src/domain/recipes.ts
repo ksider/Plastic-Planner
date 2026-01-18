@@ -10,7 +10,7 @@ export function defaultRecipeComponents(): RecipeComponentInput[] {
       parts_static: 100,
       parts_min: null,
       parts_max: null,
-      is_locked: 1,
+      is_locked: 0,
     },
   ];
 }
@@ -24,26 +24,14 @@ export function normalizeComponents(bodyComponents: any): RecipeComponentInput[]
 
   for (const raw of rawItems) {
     const name = String(raw.name || "").trim();
-    const is_locked = Number(raw.is_locked) === 1 ? 1 : 0;
-    const mode = is_locked ? "static" : raw.mode === "range" ? "range" : "static";
+    const is_locked = 0;
+    const mode = raw.mode === "range" ? "range" : "static";
     const removeFlag = String(raw.remove || "0") === "1";
     if (!name || removeFlag) continue;
 
     const parts_static = parseNumber(raw.parts_static);
     const parts_min = parseNumber(raw.parts_min);
     const parts_max = parseNumber(raw.parts_max);
-
-    if (is_locked) {
-      items.push({
-        name,
-        mode: "static",
-        parts_static: 100,
-        parts_min: null,
-        parts_max: null,
-        is_locked: 1,
-      });
-      continue;
-    }
 
     if (mode === "static" && parts_static === null) continue;
     if (mode === "range" && (parts_min === null || parts_max === null)) continue;
@@ -58,14 +46,14 @@ export function normalizeComponents(bodyComponents: any): RecipeComponentInput[]
     });
   }
 
-  if (!items.some((c) => c.is_locked === 1)) {
+  if (items.length === 0) {
     items.unshift({
       name: "Corn starch (fg)",
       mode: "static",
       parts_static: 100,
       parts_min: null,
       parts_max: null,
-      is_locked: 1,
+      is_locked: 0,
     });
   }
 
@@ -157,4 +145,18 @@ export function buildRecipeVariantsFromComponents(
       partsEntries,
     };
   });
+}
+
+export function recipeComponentSearchText(components: RecipeComponentInput[]) {
+  return components
+    .map((c) => {
+      if (c.mode === "range" && c.parts_min !== null && c.parts_max !== null) {
+        return `${c.name} ${c.parts_min}-${c.parts_max}`.trim();
+      }
+      if (c.parts_static !== null && c.parts_static !== undefined) {
+        return `${c.name} ${c.parts_static}`.trim();
+      }
+      return c.name;
+    })
+    .join(" ");
 }

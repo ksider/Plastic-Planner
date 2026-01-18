@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>New TPS Experiment</title>
+    <title>New Extrusion Experiment</title>
     <link rel="stylesheet" href="/public/styles.css" />
     <script defer src="/public/app.js"></script>
   </head>
@@ -10,13 +10,13 @@
     <header>
       <div class="header-line">
         <a class="back-link" href="#" data-back-link>←</a>
-        <h1>New TPS Experiment</h1>
+        <h1>New Extrusion Experiment</h1>
       </div>
-      <%- include('partials/nav', { active: 'tps' }) %>
+      <%- include('partials/nav', { active: 'extrusion' }) %>
     </header>
     <main>
       <div class="card">
-        <form method="POST" action="/tps">
+        <form method="POST" action="/extrusion">
           <div class="inline-grid">
             <div>
               <label>Experiment name</label>
@@ -35,7 +35,7 @@
           <%- include('partials/recipe_select', { recipes, title: 'Select Recipes' }) %>
 
           <div style="margin-top:12px;">
-            <button type="submit">Create TPS Experiment</button>
+            <button type="submit">Create Extrusion Experiment</button>
           </div>
         </form>
       </div>

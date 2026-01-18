@@ -11,59 +11,64 @@ import {
   normalizeCheckbox,
 } from "../domain/im.js";
 import {
-  buildTpsDecisionSupportAnalysis,
-  defaultTpsParamConfig,
-  parseOutputsJson,
-  parseTpsMetricKeys,
-  parseTpsOutputFields,
-} from "../domain/tps.js";
+  EXTRUSION_GEOMETRY_CODES,
+  buildStats,
+  computeRheology,
+  defaultExtrusionParamConfig,
+  parseExtrusionMetricKeys,
+  parseExtrusionOutputFields,
+  parseExtrusionOutputsJson,
+  resolveGeometry,
+} from "../domain/extrusion.js";
 import {
   buildRecipeVariantsFromComponents,
   recipeComponentSearchText,
 } from "../domain/recipes.js";
 import { uniqueFieldKey } from "../domain/experiments.js";
-import { createTpsExperiment, generateTpsRuns } from "../services/tps_service.js";
 import {
-  deactivateTpsParamConfig,
-  deleteTpsExperimentCascade,
-  findTpsParamDefinitionByCode,
-  getNextTpsRunId,
-  getPrevTpsRunId,
-  getTpsExperimentById,
-  getTpsRunById,
-  insertTpsParamConfig,
-  insertTpsParamDefinitionCustom,
-  listActiveTpsParamConfigs,
+  createExtrusionExperiment,
+  generateExtrusionRuns,
+} from "../services/extrusion_service.js";
+import {
+  deactivateExtrusionParamConfig,
+  deleteExtrusionExperimentCascade,
+  findExtrusionParamDefinitionByCode,
+  getExtrusionExperimentById,
+  getExtrusionRunById,
+  getNextExtrusionRunId,
+  getPrevExtrusionRunId,
+  insertExtrusionParamConfig,
+  insertExtrusionParamDefinitionCustom,
+  listActiveExtrusionParamConfigs,
+  listExtrusionExperimentRecipes,
+  listExtrusionExperimentsSummary,
+  listExtrusionParamConfigsByExperiment,
+  listExtrusionParamDefs,
+  listExtrusionRunParamValuesByRunIds,
+  listExtrusionRuns,
   listRecipeNames,
-  listTpsExperimentRecipes,
-  listTpsExperimentsSummary,
-  listTpsParamConfigsByExperiment,
-  listTpsParamDefs,
-  getTpsParamDef,
-  listTpsRunParamValuesByRunIds,
-  listTpsRuns,
-  updateTpsExperimentAnalysisKeys,
-  updateTpsExperimentOutputFields,
-  updateTpsRunDone,
-  updateTpsRunNotes,
-  updateTpsRunOutputs,
-  upsertTpsParamConfig,
-} from "../repos/tps_repo.js";
+  updateExtrusionExperimentAnalysisKeys,
+  updateExtrusionExperimentOutputFields,
+  updateExtrusionRunDone,
+  updateExtrusionRunNotes,
+  updateExtrusionRunOutputs,
+  upsertExtrusionParamConfig,
+} from "../repos/extrusion_repo.js";
 import { getRecipeComponentsByIds } from "../repos/experiments_repo.js";
 
-export function createTpsRouter(db: Database) {
+export function createExtrusionRouter(db: Database) {
   const router = express.Router();
 
   router.get(
-    "/tps",
+    "/extrusion",
     wrap(async (_req, res) => {
-      const experiments = await listTpsExperimentsSummary(db);
-      res.render("tps_index", { experiments });
+      const experiments = await listExtrusionExperimentsSummary(db);
+      res.render("extrusion_index", { experiments });
     })
   );
 
   router.get(
-    "/tps/new",
+    "/extrusion/new",
     wrap(async (_req, res) => {
       const recipes = await listRecipeNames(db);
       const recipeIds = recipes.map((r: any) => r.id);
@@ -82,12 +87,12 @@ export function createTpsRouter(db: Database) {
           componentsByRecipe.get(r.id) ?? []
         ),
       }));
-      res.render("tps_new", { recipes: recipesWithComponents });
+      res.render("extrusion_new", { recipes: recipesWithComponents });
     })
   );
 
   router.post(
-    "/tps",
+    "/extrusion",
     wrap(async (req, res) => {
       const name = String(req.body.name || "").trim();
       const seed = req.body.seed ? Number(req.body.seed) : Math.floor(Math.random() * 1e9);
@@ -102,22 +107,22 @@ export function createTpsRouter(db: Database) {
         throw new AppError({
           status: 400,
           code: "INVALID_INPUT",
-          message: "Invalid TPS experiment inputs",
+          message: "Invalid extrusion experiment inputs",
         });
       }
 
-      const experimentId = await createTpsExperiment(db, {
+      const experimentId = await createExtrusionExperiment(db, {
         name,
         seed,
         notes,
         recipeIds,
       });
-      res.redirect(`/tps/${experimentId}`);
+      res.redirect(`/extrusion/${experimentId}`);
     })
   );
 
   router.post(
-    "/tps/:id/update",
+    "/extrusion/:id/update",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const name = String(req.body.name || "").trim();
@@ -128,34 +133,34 @@ export function createTpsRouter(db: Database) {
         throw new AppError({
           status: 400,
           code: "INVALID_INPUT",
-          message: "Invalid TPS experiment inputs",
+          message: "Invalid extrusion experiment inputs",
         });
       }
 
       await db.run(
-        "UPDATE tps_experiments SET name = ?, seed = ?, notes = ? WHERE id = ?",
+        "UPDATE extrusion_experiments SET name = ?, seed = ?, notes = ? WHERE id = ?",
         [name, seed, notes, experimentId]
       );
 
-      res.redirect(`/tps/${experimentId}`);
+      res.redirect(`/extrusion/${experimentId}`);
     })
   );
 
   router.get(
-    "/tps/:id",
+    "/extrusion/:id",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).send("TPS experiment not found");
+      const experiment = await getExtrusionExperimentById(db, experimentId);
+      if (!experiment) return res.status(404).send("Extrusion experiment not found");
 
-      const paramDefs = await listTpsParamDefs(db);
-      const configs = await listTpsParamConfigsByExperiment(db, experimentId);
+      const paramDefs = await listExtrusionParamDefs(db);
+      const configs = await listExtrusionParamConfigsByExperiment(db, experimentId);
       const configMap = new Map(configs.map((c: any) => [c.param_def_id, c]));
 
       for (const def of paramDefs) {
         if (configMap.has(def.id)) continue;
-        const defaults = defaultTpsParamConfig(def.code);
-        await insertTpsParamConfig(
+        const defaults = defaultExtrusionParamConfig(def.code);
+        await insertExtrusionParamConfig(
           db,
           experimentId,
           def.id,
@@ -169,7 +174,7 @@ export function createTpsRouter(db: Database) {
       }
 
       if (paramDefs.length !== configMap.size) {
-        const refreshed = await listTpsParamConfigsByExperiment(db, experimentId);
+        const refreshed = await listExtrusionParamConfigsByExperiment(db, experimentId);
         configMap.clear();
         refreshed.forEach((c: any) => configMap.set(c.param_def_id, c));
       }
@@ -188,14 +193,14 @@ export function createTpsRouter(db: Database) {
         return { ...def, config: cfg, listString };
       });
 
-      const activeConfigs = await listActiveTpsParamConfigs(db, experimentId);
+      const activeConfigs = await listActiveExtrusionParamConfigs(db, experimentId);
       const availableDefs = paramDefs.filter((d) => {
         const cfg = configMap.get(d.id);
         return !cfg || cfg.active !== 1;
       });
 
       const recipes = await listRecipeNames(db);
-      const selectedRecipes = await listTpsExperimentRecipes(db, experimentId);
+      const selectedRecipes = await listExtrusionExperimentRecipes(db, experimentId);
       const recipeIds = selectedRecipes.map((r: any) => r.id);
       const recipeComponents = recipeIds.length
         ? await getRecipeComponentsByIds(db, recipeIds)
@@ -222,8 +227,8 @@ export function createTpsRouter(db: Database) {
           }, 0)
         : 1;
 
-      const runs = await listTpsRuns(db, experimentId);
-      const runParamRows = await listTpsRunParamValuesByRunIds(
+      const runs = await listExtrusionRuns(db, experimentId);
+      const runParamRows = await listExtrusionRunParamValuesByRunIds(
         db,
         runs.map((r: any) => r.id)
       );
@@ -243,8 +248,8 @@ export function createTpsRouter(db: Database) {
         return { ...run, keyValues };
       });
 
-      const outputFields = parseTpsOutputFields(experiment.output_fields_json);
-      const analysisMetricKeys = parseTpsMetricKeys(
+      const outputFields = parseExtrusionOutputFields(experiment.output_fields_json);
+      const analysisMetricKeys = parseExtrusionMetricKeys(
         experiment.analysis_metric_keys_json
       );
 
@@ -272,7 +277,141 @@ export function createTpsRouter(db: Database) {
         return Math.max(1, Math.round(total * recipeVariantCount));
       })();
 
-      res.render("tps_show", {
+      const configsByCode = new Map(
+        params.map((p) => [p.code, p.config || null])
+      );
+      const configValueFor = (code: string) => {
+        const cfg = configsByCode.get(code);
+        if (!cfg) return null;
+        const candidates = [
+          cfg.fixed_value,
+          cfg.range_min,
+          cfg.range_max,
+        ];
+        for (const candidate of candidates) {
+          if (candidate === null || candidate === undefined || candidate === "") continue;
+          const num = Number(candidate);
+          if (Number.isFinite(num)) return num;
+        }
+        if (cfg.list_json) {
+          try {
+            const list = JSON.parse(cfg.list_json);
+            if (Array.isArray(list) && list.length > 0) {
+              const num = Number(list[0]);
+              if (Number.isFinite(num)) return num;
+            }
+          } catch {
+            return null;
+          }
+        }
+        return null;
+      };
+      const geometry = resolveGeometry(configsByCode);
+      const pressureDef = paramDefs.find((d) => d.code === "pressure_bar") || null;
+
+      const labelFor = (run: any) => {
+        const base = run.recipe_name || "Unassigned";
+        return run.recipe_variant ? `${base} (${run.recipe_variant})` : base;
+      };
+
+      const analysisRuns = runs.map((run: any) => {
+        const outputs = parseExtrusionOutputsJson(run.outputs_json);
+        const pressure =
+          pressureDef !== null
+            ? runParamMap.get(`${run.id}:${pressureDef.id}`) ??
+              configValueFor("pressure_bar")
+            : null;
+        const pressurePa =
+          pressure !== null ? pressure * 1e5 * (geometry.pressure_coeff_kp ?? 1) : null;
+        const metrics = computeRheology({
+          outputs,
+          pressureBar: pressure,
+          geometry,
+        });
+        return {
+          run_id: run.id,
+          run_code: run.run_code,
+          recipe: labelFor(run),
+          pressure,
+          pressure_pa: pressurePa,
+          notes: run.notes,
+          metrics,
+        };
+      });
+
+      const shearValues = analysisRuns
+        .map((r) => r.metrics.shear_rate_s)
+        .filter((v): v is number => v !== null);
+      const viscosityValues = analysisRuns
+        .map((r) => r.metrics.viscosity_pa_s)
+        .filter((v): v is number => v !== null);
+
+      const recipeStatsMap = new Map<
+        string,
+        { shear: number[]; viscosities: number[] }
+      >();
+      for (const run of analysisRuns) {
+        const entry = recipeStatsMap.get(run.recipe) || {
+          shear: [],
+          viscosities: [],
+        };
+        if (run.metrics.shear_rate_s !== null) {
+          entry.shear.push(run.metrics.shear_rate_s);
+        }
+        if (run.metrics.viscosity_pa_s !== null) {
+          entry.viscosities.push(run.metrics.viscosity_pa_s);
+        }
+        recipeStatsMap.set(run.recipe, entry);
+      }
+      const recipeStats = Array.from(recipeStatsMap.entries()).map(
+        ([recipe, values]) => ({
+          recipe,
+          shear: buildStats(values.shear),
+          viscosity: buildStats(values.viscosities),
+        })
+      );
+
+      const analysisParams = activeDefs.filter(
+        (def) => !EXTRUSION_GEOMETRY_CODES.has(def.code)
+      );
+      const paramStats = analysisParams.map((def) => {
+        const levelMap = new Map<number, { shear: number[]; viscosities: number[] }>();
+        for (const run of analysisRuns) {
+          const value = runParamMap.get(`${run.run_id}:${def.id}`) ?? null;
+          if (value === null || value === undefined) continue;
+          const entry = levelMap.get(value) || { shear: [], viscosities: [] };
+          if (run.metrics.shear_rate_s !== null) {
+            entry.shear.push(run.metrics.shear_rate_s);
+          }
+          if (run.metrics.viscosity_pa_s !== null) {
+            entry.viscosities.push(run.metrics.viscosity_pa_s);
+          }
+          levelMap.set(value, entry);
+        }
+        const levels = Array.from(levelMap.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([value, values]) => ({
+            value,
+            shear: buildStats(values.shear),
+            viscosity: buildStats(values.viscosities),
+          }));
+        return { def, levels };
+      });
+
+      const analysis = {
+        runCount: analysisRuns.length,
+        missingFlow: analysisRuns.filter((r) => r.metrics.shear_rate_s === null)
+          .length,
+        missingPressure: analysisRuns.filter((r) => r.pressure === null).length,
+        shearOverall: buildStats(shearValues),
+        viscosityOverall: buildStats(viscosityValues),
+        recipeStats,
+        paramStats,
+        runs: analysisRuns,
+        geometry,
+      };
+
+      res.render("extrusion_show", {
         experiment,
         params,
         availableDefs,
@@ -286,12 +425,13 @@ export function createTpsRouter(db: Database) {
         maxRunsDefault,
         formatNumber,
         warning: req.query.warning || "",
+        analysis,
       });
     })
   );
 
   router.post(
-    "/tps/:id/params",
+    "/extrusion/:id/params",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const payload = req.body?.params || {};
@@ -305,7 +445,7 @@ export function createTpsRouter(db: Database) {
         const rangeMax = parseNumberFlexible((config as any).range_max);
         const listValues = parseListNumbers((config as any).list_values || "");
         const listJson = listValues.length ? JSON.stringify(listValues) : null;
-        await upsertTpsParamConfig(
+        await upsertExtrusionParamConfig(
           db,
           experimentId,
           id,
@@ -322,24 +462,24 @@ export function createTpsRouter(db: Database) {
   );
 
   router.post(
-    "/tps/:id/params/:paramId/delete",
+    "/extrusion/:id/params/:paramId/delete",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const paramId = Number(req.params.paramId);
-      await deactivateTpsParamConfig(db, experimentId, paramId);
+      await deactivateExtrusionParamConfig(db, experimentId, paramId);
       res.json({ ok: true });
     })
   );
 
   router.post(
-    "/tps/:id/add-param",
+    "/extrusion/:id/add-param",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const paramDefId = Number(req.body.param_def_id || 0);
-      if (!paramDefId) return res.redirect(`/tps/${experimentId}`);
-      const def = await getTpsParamDef(db, paramDefId);
-      const defaults = defaultTpsParamConfig(def?.code || "");
-      await upsertTpsParamConfig(
+      if (!paramDefId) return res.redirect(`/extrusion/${experimentId}`);
+      const def = await getExtrusionParamDef(db, paramDefId);
+      const defaults = defaultExtrusionParamConfig(def?.code || "");
+      await upsertExtrusionParamConfig(
         db,
         experimentId,
         paramDefId,
@@ -350,28 +490,28 @@ export function createTpsRouter(db: Database) {
         defaults.list_json ?? null,
         1
       );
-      res.redirect(`/tps/${experimentId}#tab-tps-design`);
+      res.redirect(`/extrusion/${experimentId}#tab-extrusion-design`);
     })
   );
 
   router.post(
-    "/tps/:id/add-custom-param",
+    "/extrusion/:id/add-custom-param",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const label = String(req.body.label || "").trim();
       const unit = String(req.body.unit || "").trim() || null;
       const mode = String(req.body.mode || "FIXED");
       if (!label) {
-        return res.redirect(`/tps/${experimentId}#tab-tps-design`);
+        return res.redirect(`/extrusion/${experimentId}#tab-extrusion-design`);
       }
       const codeBase = slugify(label) || "param";
       let code = codeBase;
       let i = 2;
-      while (await findTpsParamDefinitionByCode(db, code)) {
+      while (await findExtrusionParamDefinitionByCode(db, code)) {
         code = `${codeBase}_${i}`;
         i += 1;
       }
-      const insertResult = await insertTpsParamDefinitionCustom(
+      const insertResult = await insertExtrusionParamDefinitionCustom(
         db,
         code,
         label,
@@ -383,7 +523,7 @@ export function createTpsRouter(db: Database) {
       const rangeMax = parseNumberFlexible(req.body.range_max);
       const listValues = parseListNumbers(String(req.body.list_values || ""));
       const listJson = listValues.length ? JSON.stringify(listValues) : null;
-      await upsertTpsParamConfig(
+      await upsertExtrusionParamConfig(
         db,
         experimentId,
         paramDefId,
@@ -394,55 +534,55 @@ export function createTpsRouter(db: Database) {
         listJson,
         1
       );
-      res.redirect(`/tps/${experimentId}#tab-tps-design`);
+      res.redirect(`/extrusion/${experimentId}#tab-extrusion-design`);
     })
   );
 
   router.post(
-    "/tps/:id/generate-runs",
+    "/extrusion/:id/generate-runs",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).send("TPS experiment not found");
+      const experiment = await getExtrusionExperimentById(db, experimentId);
+      if (!experiment) return res.status(404).send("Extrusion experiment not found");
       const maxRuns = Number(req.body.max_runs || 0) || 1;
-      const { warning } = await generateTpsRuns(db, {
+      const { warning } = await generateExtrusionRuns(db, {
         experimentId,
         maxRuns,
         seed: experiment.seed,
       });
       const warningParam = warning ? `?warning=${encodeURIComponent(warning)}` : "";
-      res.redirect(`/tps/${experimentId}${warningParam}#tab-tps-runs`);
+      res.redirect(`/extrusion/${experimentId}${warningParam}#tab-extrusion-runs`);
     })
   );
 
   router.post(
-    "/tps/:id/delete",
+    "/extrusion/:id/delete",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
-      await deleteTpsExperimentCascade(db, experimentId);
-      res.redirect("/tps");
+      await deleteExtrusionExperimentCascade(db, experimentId);
+      res.redirect("/extrusion");
     })
   );
 
   router.post(
-    "/tps/:id/runs/:runId",
+    "/extrusion/:id/runs/:runId",
     wrap(async (req, res) => {
       const runId = Number(req.params.runId);
-      const run = await getTpsRunById(db, runId);
+      const run = await getExtrusionRunById(db, runId);
       if (!run) return res.status(404).send("Run not found");
 
-      const outputs = parseOutputsJson(run.outputs_json);
+      const outputs = parseExtrusionOutputsJson(run.outputs_json);
       const payload = req.body || {};
 
       for (const [key, value] of Object.entries(payload)) {
         if (key === "notes") {
           const notes = String(normalizeFieldValue(value)).trim();
-          await updateTpsRunNotes(db, runId, notes || null);
+          await updateExtrusionRunNotes(db, runId, notes || null);
           continue;
         }
         if (key === "done") {
           const done = normalizeCheckbox(value);
-          await updateTpsRunDone(db, runId, done ? 1 : 0);
+          await updateExtrusionRunDone(db, runId, done ? 1 : 0);
           continue;
         }
         if (key.startsWith("output__")) {
@@ -456,29 +596,54 @@ export function createTpsRouter(db: Database) {
         }
       }
 
-      await updateTpsRunOutputs(db, runId, JSON.stringify(outputs));
+      await updateExtrusionRunOutputs(db, runId, JSON.stringify(outputs));
       res.json({ ok: true });
     })
   );
 
   router.get(
-    "/tps/:id/runs/:runId",
+    "/extrusion/:id/runs/:runId",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const runId = Number(req.params.runId);
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).send("TPS experiment not found");
-      const run = await getTpsRunById(db, runId);
+      const experiment = await getExtrusionExperimentById(db, experimentId);
+      if (!experiment) return res.status(404).send("Extrusion experiment not found");
+      const run = await getExtrusionRunById(db, runId);
       if (!run) return res.status(404).send("Run not found");
 
-      const paramDefs = await listTpsParamDefs(db);
-      const runParamRows = await listTpsRunParamValuesByRunIds(db, [runId]);
+      const paramDefs = await listExtrusionParamDefs(db);
+      const configs = await listExtrusionParamConfigsByExperiment(db, experimentId);
+      const configByDefId = new Map(configs.map((c: any) => [c.param_def_id, c]));
+      const runParamRows = await listExtrusionRunParamValuesByRunIds(db, [runId]);
       const runParamMap = new Map(
         runParamRows.map((r: any) => [r.param_def_id, r.value_real])
       );
       const paramValues = paramDefs.map((def) => ({
         ...def,
-        value: runParamMap.get(def.id) ?? null,
+        value:
+          runParamMap.get(def.id) ??
+          (() => {
+            const cfg = configByDefId.get(def.id);
+            if (!cfg) return null;
+            const candidates = [cfg.fixed_value, cfg.range_min, cfg.range_max];
+            for (const candidate of candidates) {
+              if (candidate === null || candidate === undefined || candidate === "") continue;
+              const num = Number(candidate);
+              if (Number.isFinite(num)) return num;
+            }
+            if (cfg.list_json) {
+              try {
+                const list = JSON.parse(cfg.list_json);
+                if (Array.isArray(list) && list.length > 0) {
+                  const num = Number(list[0]);
+                  if (Number.isFinite(num)) return num;
+                }
+              } catch {
+                return null;
+              }
+            }
+            return null;
+          })(),
       }));
 
       let recipeParts: Array<{ name: string; parts_used: number }> = [];
@@ -492,13 +657,13 @@ export function createTpsRouter(db: Database) {
         recipeParts = (match || variants[0] || { partsEntries: [] }).partsEntries;
       }
 
-      const outputFields = parseTpsOutputFields(experiment.output_fields_json);
-      const outputs = parseOutputsJson(run.outputs_json);
+      const outputFields = parseExtrusionOutputFields(experiment.output_fields_json);
+      const outputs = parseExtrusionOutputsJson(run.outputs_json);
 
-      const prev = await getPrevTpsRunId(db, experimentId, run.run_order);
-      const next = await getNextTpsRunId(db, experimentId, run.run_order);
+      const prev = await getPrevExtrusionRunId(db, experimentId, run.run_order);
+      const next = await getNextExtrusionRunId(db, experimentId, run.run_order);
 
-      res.render("tps_run_detail", {
+      res.render("extrusion_run_detail", {
         experiment,
         run,
         paramValues,
@@ -512,16 +677,16 @@ export function createTpsRouter(db: Database) {
   );
 
   router.post(
-    "/tps/:id/fields",
+    "/extrusion/:id/fields",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).send("TPS experiment not found");
+      const experiment = await getExtrusionExperimentById(db, experimentId);
+      if (!experiment) return res.status(404).send("Extrusion experiment not found");
       const label = String(req.body.label || "").trim();
-      if (!label) return res.redirect(`/tps/${experimentId}#tab-tps-runs`);
+      if (!label) return res.redirect(`/extrusion/${experimentId}#tab-extrusion-runs`);
       const type =
         req.body.type === "number" ? "number" : req.body.type === "tags" ? "tags" : "text";
-      const fields = parseTpsOutputFields(experiment.output_fields_json);
+      const fields = parseExtrusionOutputFields(experiment.output_fields_json);
       const key = uniqueFieldKey(label, fields);
       const options =
         type === "tags"
@@ -531,19 +696,23 @@ export function createTpsRouter(db: Database) {
               .filter(Boolean)
           : [];
       fields.push({ key, label, type, options, analyze: type === "number" });
-      await updateTpsExperimentOutputFields(db, experimentId, JSON.stringify(fields));
-      res.redirect(`/tps/${experimentId}#tab-tps-runs`);
+      await updateExtrusionExperimentOutputFields(
+        db,
+        experimentId,
+        JSON.stringify(fields)
+      );
+      res.redirect(`/extrusion/${experimentId}#tab-extrusion-runs`);
     })
   );
 
   router.post(
-    "/tps/:id/fields/:key/update",
+    "/extrusion/:id/fields/:key/update",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const key = String(req.params.key || "");
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).send("TPS experiment not found");
-      const fields = parseTpsOutputFields(experiment.output_fields_json);
+      const experiment = await getExtrusionExperimentById(db, experimentId);
+      if (!experiment) return res.status(404).send("Extrusion experiment not found");
+      const fields = parseExtrusionOutputFields(experiment.output_fields_json);
       const updated = fields.map((f) => {
         if (f.key !== key) return f;
         const label = String(req.body.label || f.label).trim() || f.label;
@@ -558,27 +727,35 @@ export function createTpsRouter(db: Database) {
             : [];
         return { ...f, label, type, options };
       });
-      await updateTpsExperimentOutputFields(db, experimentId, JSON.stringify(updated));
-      res.redirect(`/tps/${experimentId}#tab-tps-runs`);
+      await updateExtrusionExperimentOutputFields(
+        db,
+        experimentId,
+        JSON.stringify(updated)
+      );
+      res.redirect(`/extrusion/${experimentId}#tab-extrusion-runs`);
     })
   );
 
   router.post(
-    "/tps/:id/fields/:key",
+    "/extrusion/:id/fields/:key",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const key = String(req.params.key || "");
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).send("TPS experiment not found");
-      const fields = parseTpsOutputFields(experiment.output_fields_json);
+      const experiment = await getExtrusionExperimentById(db, experimentId);
+      if (!experiment) return res.status(404).send("Extrusion experiment not found");
+      const fields = parseExtrusionOutputFields(experiment.output_fields_json);
       const updated = fields.map((f) =>
         f.key === key ? { ...f, analyze: Boolean(req.body.analyze) } : f
       );
       const analyzeKeys = updated
         .filter((f) => f.type === "number" && f.analyze)
         .map((f) => f.key);
-      await updateTpsExperimentOutputFields(db, experimentId, JSON.stringify(updated));
-      await updateTpsExperimentAnalysisKeys(
+      await updateExtrusionExperimentOutputFields(
+        db,
+        experimentId,
+        JSON.stringify(updated)
+      );
+      await updateExtrusionExperimentAnalysisKeys(
         db,
         experimentId,
         JSON.stringify(analyzeKeys)
@@ -588,78 +765,24 @@ export function createTpsRouter(db: Database) {
   );
 
   router.post(
-    "/tps/:id/fields/:key/delete",
+    "/extrusion/:id/fields/:key/delete",
     wrap(async (req, res) => {
       const experimentId = Number(req.params.id);
       const key = String(req.params.key || "");
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).send("TPS experiment not found");
-      const fields = parseTpsOutputFields(experiment.output_fields_json);
+      const experiment = await getExtrusionExperimentById(db, experimentId);
+      if (!experiment) return res.status(404).send("Extrusion experiment not found");
+      const fields = parseExtrusionOutputFields(experiment.output_fields_json);
       const target = fields.find((f) => f.key === key);
       if (target?.is_default) {
         return res.status(400).send("Default fields cannot be deleted");
       }
       const updated = fields.filter((f) => f.key !== key);
-      await updateTpsExperimentOutputFields(db, experimentId, JSON.stringify(updated));
-      res.redirect(`/tps/${experimentId}#tab-tps-runs`);
-    })
-  );
-
-  router.get(
-    "/tps/:id/analysis.json",
-    wrap(async (req, res) => {
-      const experimentId = Number(req.params.id);
-      const experiment = await getTpsExperimentById(db, experimentId);
-      if (!experiment) return res.status(404).json({ error: "Not found" });
-
-      const outputFields = parseTpsOutputFields(experiment.output_fields_json);
-      const metricQuery =
-        typeof req.query.metrics === "string" ? req.query.metrics : "";
-      const metricKeys =
-        metricQuery.trim().length > 0
-          ? metricQuery.split(",").map((v) => v.trim()).filter((v) => v)
-          : parseTpsMetricKeys(experiment.analysis_metric_keys_json);
-
-      const runs = await listTpsRuns(db, experimentId);
-      const runParamRows = await listTpsRunParamValuesByRunIds(
+      await updateExtrusionExperimentOutputFields(
         db,
-        runs.map((r: any) => r.id)
+        experimentId,
+        JSON.stringify(updated)
       );
-      const runParamMap = new Map(
-        runParamRows.map((r: any) => [`${r.run_id}:${r.param_def_id}`, r.value_real])
-      );
-      const paramDefs = await listTpsParamDefs(db);
-      const tempDef = paramDefs.find((d) => d.code === "heating_temp_c");
-      const scatterDef = paramDefs.find((d) => d.code === "gelation_time_min");
-
-      const rows = runs.map((run: any) => {
-        const outputs = parseOutputsJson(run.outputs_json);
-        const temp = tempDef
-          ? runParamMap.get(`${run.id}:${tempDef.id}`) ?? null
-          : null;
-        const scatter = scatterDef
-          ? runParamMap.get(`${run.id}:${scatterDef.id}`) ?? null
-          : null;
-        return {
-          run_code: run.run_code,
-          recipe_name: run.recipe_name,
-          recipe_variant: run.recipe_variant ?? null,
-          temp,
-          scatter,
-          outputs,
-          notes: run.notes,
-        };
-      });
-
-      const analysis = buildTpsDecisionSupportAnalysis({
-        runs: rows,
-        outputFields,
-        metricKeys,
-        tempLabel: "Heating temp",
-        scatterLabel: "Gelation time",
-      });
-
-      res.json(analysis);
+      res.redirect(`/extrusion/${experimentId}#tab-extrusion-runs`);
     })
   );
 
