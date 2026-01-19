@@ -6,33 +6,34 @@
     <link rel="stylesheet" href="/public/styles.css" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
     <script defer src="/public/app.js"></script>
-    <script defer src="/public/extrusion.js"></script>
-    <script defer src="/public/extrusion_analysis.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script defer src="/public/tps.js"></script>
+    <script defer src="/public/tps_analysis.js"></script>
   </head>
   <body>
     <header>
       <div class="header-line">
         <a class="back-link" href="#" data-back-link>←</a>
         <h1><%= experiment.name %></h1>
-        <button type="button" class="icon-btn" data-open-modal="extrusion-details-modal" title="Edit experiment" aria-label="Edit experiment">
+        <button type="button" class="icon-btn" data-open-modal="tps-details-modal" title="Edit experiment" aria-label="Edit experiment">
           <span class="material-symbols-outlined">edit</span>
         </button>
       </div>
-      <%- include('partials/nav', { active: 'extrusion' }) %>
+      <%- include('../shared/partials/nav', { active: 'tps' }) %>
       <div class="small">Seed: <%= experiment.seed %></div>
-      <form method="POST" action="/extrusion/<%= experiment.id %>/delete" onsubmit="return confirm('Delete experiment and all data?')" style="margin-top:8px;">
+      <form method="POST" action="/tps/<%= experiment.id %>/delete" onsubmit="return confirm('Delete experiment and all data?')" style="margin-top:8px;">
         <button class="btn secondary" type="submit">Delete Experiment</button>
       </form>
     </header>
     <main>
-      <div class="modal" data-modal="extrusion-details-modal">
-        <div class="modal-backdrop" data-close-modal="extrusion-details-modal"></div>
+      <div class="modal" data-modal="tps-details-modal">
+        <div class="modal-backdrop" data-close-modal="tps-details-modal"></div>
         <div class="modal-card">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <h3 style="margin:0;">Edit experiment</h3>
-            <button type="button" class="icon-btn" data-close-modal="extrusion-details-modal" aria-label="Close">✕</button>
+            <button type="button" class="icon-btn" data-close-modal="tps-details-modal" aria-label="Close">✕</button>
           </div>
-          <form method="POST" action="/extrusion/<%= experiment.id %>/update" class="inline-grid" style="margin-top:12px;">
+          <form method="POST" action="/tps/<%= experiment.id %>/update" class="inline-grid" style="margin-top:12px;">
             <div>
               <label>Name</label>
               <input name="name" value="<%= experiment.name %>" required />
@@ -46,22 +47,22 @@
               <textarea name="notes" rows="2"><%= experiment.notes || '' %></textarea>
             </div>
             <div style="align-self:end; display:flex; gap:8px;">
-              <button type="button" class="secondary" data-close-modal="extrusion-details-modal">Cancel</button>
+              <button type="button" class="secondary" data-close-modal="tps-details-modal">Cancel</button>
               <button type="submit">Save</button>
             </div>
           </form>
         </div>
       </div>
       <div class="tab-buttons">
-        <button class="active" data-tab-target="tab-extrusion-design">Design</button>
-        <button data-tab-target="tab-extrusion-runs">Runs</button>
-        <button data-tab-target="tab-extrusion-analysis">Analysis</button>
+        <button class="active" data-tab-target="tab-tps-design">Design</button>
+        <button data-tab-target="tab-tps-runs">Runs</button>
+        <button data-tab-target="tab-tps-analysis">Analysis</button>
       </div>
 
-      <section id="tab-extrusion-design" class="tab-panel active">
+      <section id="tab-tps-design" class="tab-panel active">
         <div class="card">
           <h2>Process settings</h2>
-          <form method="POST" action="/extrusion/<%= experiment.id %>/params" data-extrusion-param-form data-experiment-id="<%= experiment.id %>" data-redirect="#tab-extrusion-design">
+          <form method="POST" action="/tps/<%= experiment.id %>/params" data-tps-param-form data-experiment-id="<%= experiment.id %>" data-redirect="#tab-tps-design">
             <div class="table-wrap">
               <table class="im-params">
                 <thead>
@@ -101,7 +102,7 @@
                         </div>
                       </td>
                       <td>
-                        <button class="icon-btn danger" type="button" data-extrusion-delete-param="/extrusion/<%= experiment.id %>/params/<%= def.id %>/delete" aria-label="Remove setting">✕</button>
+                        <button class="icon-btn danger" type="button" data-tps-delete-param="/tps/<%= experiment.id %>/params/<%= def.id %>/delete" aria-label="Remove setting">✕</button>
                       </td>
                     </tr>
                   <% }) %>
@@ -109,20 +110,20 @@
               </table>
             </div>
             <div style="margin-top:12px;">
-              <button type="button" class="secondary" data-open-modal="extrusion-param-modal">Add setting</button>
+              <button type="button" class="secondary" data-open-modal="tps-param-modal">Add setting</button>
             </div>
           </form>
         </div>
 
-        <div class="modal" data-modal="extrusion-param-modal">
-          <div class="modal-backdrop" data-close-modal="extrusion-param-modal"></div>
+        <div class="modal" data-modal="tps-param-modal">
+          <div class="modal-backdrop" data-close-modal="tps-param-modal"></div>
           <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h3 style="margin:0;">Add setting</h3>
-              <button type="button" class="icon-btn" data-close-modal="extrusion-param-modal" aria-label="Close">✕</button>
+              <button type="button" class="icon-btn" data-close-modal="tps-param-modal" aria-label="Close">✕</button>
             </div>
             <div class="inline-grid" style="margin-top:12px;">
-              <form method="POST" action="/extrusion/<%= experiment.id %>/add-param">
+              <form method="POST" action="/tps/<%= experiment.id %>/add-param">
                 <h4 style="margin:0 0 8px;">Standard setting</h4>
                 <div>
                   <label>Setting</label>
@@ -162,7 +163,7 @@
                   <button type="submit">Add setting</button>
                 </div>
               </form>
-              <form method="POST" action="/extrusion/<%= experiment.id %>/add-custom-param">
+              <form method="POST" action="/tps/<%= experiment.id %>/add-custom-param">
                 <h4 style="margin:0 0 8px;">Custom setting</h4>
                 <div>
                   <label>Label</label>
@@ -170,7 +171,7 @@
                 </div>
                 <div>
                   <label>Unit</label>
-                  <input name="unit" placeholder="bar, s, °C" />
+                  <input name="unit" placeholder="°C, min, level" />
                 </div>
                 <div>
                   <label>Mode</label>
@@ -207,13 +208,13 @@
         </div>
       </section>
 
-      <section id="tab-extrusion-runs" class="tab-panel">
+      <section id="tab-tps-runs" class="tab-panel">
         <div class="card">
           <h2>Run Matrix</h2>
           <% if (warning) { %>
             <div class="note"><%= warning %></div>
           <% } %>
-          <form method="POST" action="/extrusion/<%= experiment.id %>/generate-runs" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;" data-recipe-count="<%= recipeVariantCount || 1 %>">
+          <form method="POST" action="/tps/<%= experiment.id %>/generate-runs" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;" data-recipe-count="<%= recipeVariantCount || 1 %>">
             <div>
               <label>Max runs</label>
               <input name="max_runs" type="number" min="1" value="<%= maxRunsDefault || 16 %>" data-max-runs-input data-auto="1" />
@@ -225,7 +226,7 @@
             <div class="small">Custom output fields appear as new columns.</div>
             <button type="button" class="secondary" data-open-field-modal>Add Output Field</button>
           </div>
-          <div class="modal" id="extrusion-field-modal" aria-hidden="true">
+          <div class="modal" id="tps-field-modal" aria-hidden="true">
             <div class="modal-backdrop" data-close-field-modal></div>
             <div class="modal-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -234,11 +235,11 @@
                   <span class="material-symbols-outlined">close</span>
                 </button>
               </div>
-              <form method="POST" action="/extrusion/<%= experiment.id %>/fields" data-add-action="/extrusion/<%= experiment.id %>/fields" class="inline-grid" style="margin-top:12px;" data-field-form>
+              <form method="POST" action="/tps/<%= experiment.id %>/fields" data-add-action="/tps/<%= experiment.id %>/fields" class="inline-grid" style="margin-top:12px;" data-field-form>
                 <input type="hidden" name="key" value="" data-field-key-input />
                 <div>
                   <label>Field name</label>
-                  <input name="label" placeholder="e.g. Flow speed" required data-field-label-input />
+                  <input name="label" placeholder="e.g. Moisture %" required data-field-label-input />
                 </div>
                 <div>
                   <label>Type</label>
@@ -250,7 +251,7 @@
                 </div>
                 <div>
                   <label>Tag options (comma-separated)</label>
-                  <input name="options" placeholder="stable, unstable" data-field-options-input />
+                  <input name="options" placeholder="flexible, brittle" data-field-options-input />
                 </div>
                 <div style="align-self:end; display:flex; gap:8px;">
                   <button type="button" class="secondary" data-close-field-modal>Cancel</button>
@@ -260,25 +261,28 @@
             </div>
           </div>
           <div class="table-wrap" style="margin-top:12px;">
-            <table id="extrusion-runs-table">
+            <table id="tps-runs-table">
               <thead>
                 <tr>
                   <th>Order</th>
                   <th>RunCode</th>
                   <th>Recipe</th>
-                  <% activeDefs.forEach((def) => { %>
-                    <th><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></th>
-                  <% }) %>
                   <% outputFields.forEach((field) => { %>
                     <th>
                       <div class="field-header">
                         <span><%= field.label %></span>
                         <div class="field-icons">
-                          <button type="button" class="icon-btn" title="Edit" data-edit-field data-field-key="<%= field.key %>" data-field-label="<%= field.label %>" data-field-type="<%= field.type %>" data-field-options="<%= (field.options || []).join(', ') %>" data-field-default="<%= field.is_default ? '1' : '0' %>">
+                          <% if (field.type === 'number') { %>
+                            <label class="icon-toggle" title="Include in analysis">
+                              <input type="checkbox" data-tps-field-toggle data-field-key="<%= field.key %>" <%= field.is_core ? 'data-field-core=\"1\"' : '' %> <%= analysisMetricKeys.includes(field.key) ? 'checked' : '' %> />
+                              <span class="material-symbols-outlined">analytics</span>
+                            </label>
+                          <% } %>
+                          <button type="button" class="icon-btn" title="Edit" data-edit-field data-field-key="<%= field.key %>" data-field-label="<%= field.label %>" data-field-type="<%= field.type %>" data-field-options="<%= (field.options || []).join(', ') %>" data-field-core="<%= field.is_core ? '1' : '0' %>" data-field-default="<%= field.is_default ? '1' : '0' %>">
                             <span class="material-symbols-outlined">edit</span>
                           </button>
                           <% if (!field.is_default) { %>
-                            <form method="POST" action="/extrusion/<%= experiment.id %>/fields/<%= field.key %>/delete" class="field-delete-form" onsubmit="return confirm('Delete this field and its data?')">
+                            <form method="POST" action="/tps/<%= experiment.id %>/fields/<%= field.key %>/delete" class="field-delete-form" onsubmit="return confirm('Delete this field and its data?')">
                               <button type="submit" class="icon-btn" title="Delete">
                                 <span class="material-symbols-outlined">delete</span>
                               </button>
@@ -293,14 +297,14 @@
               </thead>
               <tbody>
                 <% if (runs.length === 0) { %>
-                  <tr><td colspan="<%= 4 + activeDefs.length + outputFields.length %>">No runs yet.</td></tr>
+                  <tr><td colspan="<%= 4 + outputFields.length %>">No runs yet.</td></tr>
                 <% } %>
                 <% runs.forEach((run) => { %>
                   <% const outputs = run.outputs_json ? JSON.parse(run.outputs_json) : {}; %>
                   <tr class="<%= run.done ? 'row-done' : '' %>">
                     <td><%= run.run_order %></td>
                     <td>
-                      <a href="/extrusion/<%= experiment.id %>/runs/<%= run.id %>"><%= run.run_code %></a>
+                      <a href="/tps/<%= experiment.id %>/runs/<%= run.id %>"><%= run.run_code %></a>
                       <% if (run.done) { %>
                         <span class="badge ok">DONE</span>
                       <% } %>
@@ -311,25 +315,22 @@
                         <span class="badge tiny"><%= run.recipe_variant %></span>
                       <% } %>
                     </td>
-                    <% activeDefs.forEach((def) => { %>
-                      <td><%= formatNumber(run.keyValues[def.code]) %></td>
-                    <% }) %>
                     <% outputFields.forEach((field) => { %>
                       <td>
                         <% if (field.type === 'tags') { %>
-                          <select data-inline-save data-url="/extrusion/<%= experiment.id %>/runs/<%= run.id %>" name="output__<%= field.key %>">
+                          <select data-inline-save data-url="/tps/<%= experiment.id %>/runs/<%= run.id %>" name="output__<%= field.key %>">
                             <option value=""></option>
                             <% (field.options || []).forEach((opt) => { %>
                               <option value="<%= opt %>" <%= outputs[field.key] === opt ? 'selected' : '' %>><%= opt %></option>
                             <% }) %>
                           </select>
                         <% } else { %>
-                          <input data-inline-save data-url="/extrusion/<%= experiment.id %>/runs/<%= run.id %>" name="output__<%= field.key %>" value="<%= outputs[field.key] ?? '' %>" />
+                          <input data-inline-save data-url="/tps/<%= experiment.id %>/runs/<%= run.id %>" name="output__<%= field.key %>" value="<%= outputs[field.key] ?? '' %>" />
                         <% } %>
                       </td>
                     <% }) %>
                     <td>
-                      <textarea data-inline-save data-url="/extrusion/<%= experiment.id %>/runs/<%= run.id %>" name="notes"><%= run.notes ?? '' %></textarea>
+                      <textarea data-inline-save data-url="/tps/<%= experiment.id %>/runs/<%= run.id %>" name="notes"><%= run.notes ?? '' %></textarea>
                     </td>
                   </tr>
                 <% }) %>
@@ -339,130 +340,19 @@
         </div>
       </section>
 
-      <section id="tab-extrusion-analysis" class="tab-panel">
+      <section id="tab-tps-analysis" class="tab-panel">
         <div class="card">
-          <h2>Rheology Summary</h2>
-          <div class="small">Runs: <%= analysis.runCount %></div>
-          <div class="small">Missing shear rate: <%= analysis.missingFlow %> · Missing pressure: <%= analysis.missingPressure %></div>
-          <div class="small">Shear rate mean: <%= formatNumber(analysis.shearOverall.mean === null ? undefined : analysis.shearOverall.mean, 2) %> 1/s · Shear rate sd: <%= formatNumber(analysis.shearOverall.sd === null ? undefined : analysis.shearOverall.sd, 2) %></div>
-          <div class="small">Viscosity mean: <%= formatNumber(analysis.viscosityOverall.mean === null ? undefined : analysis.viscosityOverall.mean, 2) %> Pa·s · Viscosity sd: <%= formatNumber(analysis.viscosityOverall.sd === null ? undefined : analysis.viscosityOverall.sd, 2) %></div>
-          <div class="small" style="margin-top:6px;">
-            Geometry: piston <%= formatNumber(analysis.geometry.piston_diameter_mm, 2) %> mm · nozzle <%= formatNumber(analysis.geometry.nozzle_diameter_mm, 2) %> mm × <%= formatNumber(analysis.geometry.nozzle_length_mm, 2) %> mm · cold capillary <%= formatNumber(analysis.geometry.cold_capillary_diameter_mm, 2) %> mm × <%= formatNumber(analysis.geometry.cold_capillary_length_mm, 2) %> mm · wheel <%= formatNumber(analysis.geometry.wheel_diameter_mm, 2) %> mm · kP <%= formatNumber(analysis.geometry.pressure_coeff_kp, 2) %>
-          </div>
+          <h2>Decision Support</h2>
+          <div id="analysis-quality" data-analysis-endpoint="/tps/<%= experiment.id %>/analysis.json"></div>
+          <div id="analysis-insights" style="margin-top:12px;"></div>
         </div>
-
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-            <h2>Visuals</h2>
-            <button type="button" class="secondary" data-extrusion-recalc>Recalculate</button>
-          </div>
-          <div id="extrusion-charts" class="chart-grid"></div>
-          <script type="application/json" id="extrusion-analysis-data"><%- JSON.stringify({ runs: analysis.runs }) %></script>
+          <h2>Visuals</h2>
+          <div id="analysis-visuals" class="chart-grid"></div>
         </div>
-
-        <div class="card">
-          <h2>Computed Rheology (per run)</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>RunCode</th>
-                  <th>Recipe</th>
-                  <th>Pressure (Pa)</th>
-                  <th>Shear rate (1/s)</th>
-                  <th>Shear stress (kPa)</th>
-                  <th>Viscosity (Pa·s)</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if (analysis.runs.length === 0) { %>
-                  <tr><td colspan="7">No runs to analyze yet.</td></tr>
-                <% } %>
-                <% analysis.runs.forEach((row) => { %>
-                  <tr>
-                    <td><%= row.run_code %></td>
-                    <td><%= row.recipe %></td>
-                    <td><%= formatNumber(row.pressure_pa === null ? undefined : row.pressure_pa, 2) %></td>
-                    <td><%= formatNumber(row.metrics.shear_rate_s === null ? undefined : row.metrics.shear_rate_s, 2) %></td>
-                    <td><%= formatNumber(row.metrics.shear_stress_pa !== null ? row.metrics.shear_stress_pa / 1000 : undefined, 2) %></td>
-                    <td><%= formatNumber(row.metrics.viscosity_pa_s === null ? undefined : row.metrics.viscosity_pa_s, 2) %></td>
-                    <td><%= row.notes || '' %></td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Shear Rate + Viscosity by Recipe</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Recipe</th>
-                  <th>n</th>
-                  <th>Shear mean</th>
-                  <th>Shear sd</th>
-                  <th>Viscosity mean</th>
-                  <th>Viscosity sd</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if (analysis.recipeStats.length === 0) { %>
-                  <tr><td colspan="6">No recipe statistics yet.</td></tr>
-                <% } %>
-                <% analysis.recipeStats.forEach((row) => { %>
-                  <tr>
-                    <td><%= row.recipe %></td>
-                    <td><%= row.shear.n || row.viscosity.n %></td>
-                    <td><%= formatNumber(row.shear.mean === null ? undefined : row.shear.mean, 2) %></td>
-                    <td><%= formatNumber(row.shear.sd === null ? undefined : row.shear.sd, 2) %></td>
-                    <td><%= formatNumber(row.viscosity.mean === null ? undefined : row.viscosity.mean, 2) %></td>
-                    <td><%= formatNumber(row.viscosity.sd === null ? undefined : row.viscosity.sd, 2) %></td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <% analysis.paramStats.forEach((param) => { %>
-          <div class="card">
-            <h2><%= param.def.label %> vs Shear</h2>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th><%= param.def.label %> <%= param.def.unit ? `(${param.def.unit})` : '' %></th>
-                    <th>n</th>
-                    <th>Shear mean</th>
-                    <th>Shear sd</th>
-                    <th>Viscosity mean</th>
-                    <th>Viscosity sd</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% if (param.levels.length === 0) { %>
-                    <tr><td colspan="6">No data yet.</td></tr>
-                  <% } %>
-                  <% param.levels.forEach((level) => { %>
-                    <tr>
-                      <td><%= formatNumber(level.value === null ? undefined : level.value, 2) %></td>
-                      <td><%= level.shear.n || level.viscosity.n %></td>
-                      <td><%= formatNumber(level.shear.mean === null ? undefined : level.shear.mean, 2) %></td>
-                      <td><%= formatNumber(level.shear.sd === null ? undefined : level.shear.sd, 2) %></td>
-                      <td><%= formatNumber(level.viscosity.mean === null ? undefined : level.viscosity.mean, 2) %></td>
-                      <td><%= formatNumber(level.viscosity.sd === null ? undefined : level.viscosity.sd, 2) %></td>
-                    </tr>
-                  <% }) %>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        <% }) %>
+        <div id="analysis-metric-tables"></div>
       </section>
     </main>
   </body>
 </html>
+

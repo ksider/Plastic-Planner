@@ -20,7 +20,7 @@ export function createIndexRouter(db: Database) {
         db.get("SELECT COUNT(*) as count FROM extrusion_experiments"),
       ]);
 
-      res.render("index", {
+      res.render("home/index", {
         counts: {
           compounding: compoundingCount?.count ?? 0,
           tps: tpsCount?.count ?? 0,
@@ -33,3 +33,4 @@ export function createIndexRouter(db: Database) {
 
   return router;
 }
+

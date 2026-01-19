@@ -93,7 +93,7 @@ export function createRecipesRouter(db: Database) {
           component_has_more: false,
         };
       });
-      res.render("recipes_index", {
+      res.render("recipes/index", {
         recipes: recipesWithComponents,
       });
     })
@@ -102,7 +102,7 @@ export function createRecipesRouter(db: Database) {
   router.get(
     "/recipes/import-bpacks",
     wrap(async (req, res) => {
-      res.render("recipes_import_bpacks", { error: null });
+      res.render("recipes/import_bpacks", { error: null });
     })
   );
 
@@ -111,7 +111,7 @@ export function createRecipesRouter(db: Database) {
     upload.single("bpacks_file"),
     wrap(async (req, res) => {
       if (!req.file) {
-        return res.status(400).render("recipes_import_bpacks", {
+        return res.status(400).render("recipes/import_bpacks", {
           error: "Please choose a CSV file.",
         });
       }
@@ -120,7 +120,7 @@ export function createRecipesRouter(db: Database) {
       try {
         parsed = parseBpacksMatrix(text);
       } catch (err) {
-        return res.status(400).render("recipes_import_bpacks", {
+        return res.status(400).render("recipes/import_bpacks", {
           error: "Could not parse CSV. Please check the file format.",
         });
       }
@@ -143,7 +143,7 @@ export function createRecipesRouter(db: Database) {
         components: parsed.components,
       });
 
-      renderEjs(res, "recipes_import_bpacks_preview", {
+      renderEjs(res, "recipes/import_bpacks_preview", {
         filename: req.file.originalname,
         delimiter: parsed.delimiter === "\t" ? "TSV (tab)" : "CSV (comma)",
         recipes,
@@ -227,7 +227,7 @@ export function createRecipesRouter(db: Database) {
         }
       });
 
-      renderEjs(res, "recipes_import_bpacks_result", {
+      renderEjs(res, "recipes/import_bpacks_result", {
         created,
         updated,
         componentsInserted,
@@ -293,7 +293,7 @@ export function createRecipesRouter(db: Database) {
     "/recipes/new",
     wrap(async (req, res) => {
       const components = defaultRecipeComponents();
-      res.render("recipe_form", {
+      res.render("recipes/form", {
         recipe: null,
         components,
         imExperiments: [],
@@ -319,7 +319,7 @@ export function createRecipesRouter(db: Database) {
         recipeId
       );
 
-      res.render("recipe_form", {
+      res.render("recipes/form", {
         recipe,
         components: components.length ? components : defaultRecipeComponents(),
         imExperiments,
@@ -406,3 +406,4 @@ export function createRecipesRouter(db: Database) {
 
   return router;
 }
+

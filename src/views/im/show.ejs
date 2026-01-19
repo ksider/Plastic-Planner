@@ -18,7 +18,7 @@
           <span class="material-symbols-outlined">edit</span>
         </button>
       </div>
-      <%- include('partials/nav', { active: 'im' }) %>
+      <%- include('../shared/partials/nav', { active: 'im' }) %>
       <div class="small">ID: <%= experiment.id %> · Seed: <%= experiment.seed %></div>
       <form method="POST" action="/im/<%= experiment.id %>/delete" onsubmit="return confirm('Delete this IM experiment? This cannot be undone.');" style="margin-top:8px;">
         <button class="btn secondary" type="submit">Delete IM experiment</button>
@@ -342,3 +342,4 @@
     </main>
   </body>
 </html>
+

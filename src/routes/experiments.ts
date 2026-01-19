@@ -66,7 +66,7 @@ export function createExperimentsRouter(db: Database) {
       const experiments = await db.all(
         "SELECT id, name, final_mass_g, seed, notes, created_at FROM experiments ORDER BY created_at DESC"
       );
-      res.render("experiments_index", { experiments });
+      res.render("experiments/index", { experiments });
     })
   );
   router.get(
@@ -94,7 +94,7 @@ export function createExperimentsRouter(db: Database) {
           component_search: recipeSearchText(components, r),
         };
       });
-      res.render("experiment_new", { recipes: recipesWithComponents });
+      res.render("experiments/new", { recipes: recipesWithComponents });
     })
   );
 
@@ -215,7 +215,7 @@ export function createExperimentsRouter(db: Database) {
     );
     const analysis = buildAnalysis(batches, samples);
 
-    res.render("experiment_show", {
+    res.render("experiments/show", {
       experiment,
       recipes,
       batches,
@@ -246,7 +246,7 @@ export function createExperimentsRouter(db: Database) {
 
     const weights = buildWeightRows(batch);
 
-    res.render("batch_detail", {
+    res.render("experiments/batch_detail", {
       experiment,
       batch,
       weights,
@@ -273,7 +273,7 @@ export function createExperimentsRouter(db: Database) {
 
     const weights = buildWeightRows(sample);
 
-    res.render("sample_detail", {
+    res.render("experiments/sample_detail", {
       experiment,
       sample,
       weights,
@@ -846,3 +846,4 @@ export function createExperimentsRouter(db: Database) {
 
   return router;
 }
+

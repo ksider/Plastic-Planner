@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title><%= run.run_code %></title>
     <link rel="stylesheet" href="/public/styles.css" />
-    <script defer src="/public/extrusion.js"></script>
+    <script defer src="/public/tps.js"></script>
     <script defer src="/public/app.js"></script>
   </head>
   <body>
@@ -13,7 +13,7 @@
         <a class="back-link" href="#" data-back-link>←</a>
         <h1><%= run.run_code %></h1>
       </div>
-      <%- include('partials/nav', { active: 'extrusion' }) %>
+      <%- include('../shared/partials/nav', { active: 'tps' }) %>
       <div class="small">
         Recipe: <%= run.recipe_name || 'Unassigned' %>
         <% if (run.recipe_variant) { %>
@@ -21,18 +21,18 @@
         <% } %>
       </div>
       <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <a class="btn secondary" href="/extrusion/<%= experiment.id %>#tab-extrusion-runs">Back to experiment</a>
+        <a class="btn secondary" href="/tps/<%= experiment.id %>#tab-tps-runs">Back to experiment</a>
         <% if (prevRunId) { %>
-          <a class="btn secondary" href="/extrusion/<%= experiment.id %>/runs/<%= prevRunId %>">Prev</a>
+          <a class="btn secondary" href="/tps/<%= experiment.id %>/runs/<%= prevRunId %>">Prev</a>
         <% } %>
         <% if (nextRunId) { %>
-          <a class="btn secondary" href="/extrusion/<%= experiment.id %>/runs/<%= nextRunId %>">Next</a>
+          <a class="btn secondary" href="/tps/<%= experiment.id %>/runs/<%= nextRunId %>">Next</a>
         <% } %>
       </div>
     </header>
     <main>
       <div class="card">
-        <form data-extrusion-run-form data-extrusion-run-url="/extrusion/<%= experiment.id %>/runs/<%= run.id %>">
+        <form data-tps-run-form data-tps-run-url="/tps/<%= experiment.id %>/runs/<%= run.id %>">
           <label class="toggle-line">
             <input type="checkbox" name="done" value="1" <%= run.done ? 'checked' : '' %> />
             <span>Done</span>
@@ -105,7 +105,7 @@
 
       <div class="card">
         <h2>Measured outputs</h2>
-        <form data-extrusion-run-form data-extrusion-run-url="/extrusion/<%= experiment.id %>/runs/<%= run.id %>">
+        <form data-tps-run-form data-tps-run-url="/tps/<%= experiment.id %>/runs/<%= run.id %>">
           <div class="run-compact-grid">
             <% outputFields.forEach((field) => { %>
               <label class="run-compact-field <%= field.type === 'tags' ? 'run-wide' : '' %>">
@@ -132,3 +132,4 @@
     </main>
   </body>
 </html>
+

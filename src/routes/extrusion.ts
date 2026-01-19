@@ -65,7 +65,7 @@ export function createExtrusionRouter(db: Database) {
     "/extrusion",
     wrap(async (_req, res) => {
       const experiments = await listExtrusionExperimentsSummary(db);
-      res.render("extrusion_index", { experiments });
+      res.render("extrusion/index", { experiments });
     })
   );
 
@@ -94,7 +94,7 @@ export function createExtrusionRouter(db: Database) {
           component_search: recipeSearchText(components, r),
         };
       });
-      res.render("extrusion_new", { recipes: recipesWithComponents });
+      res.render("extrusion/new", { recipes: recipesWithComponents });
     })
   );
 
@@ -419,7 +419,7 @@ export function createExtrusionRouter(db: Database) {
         geometry,
       };
 
-      res.render("extrusion_show", {
+      res.render("extrusion/show", {
         experiment,
         params,
         availableDefs,
@@ -672,7 +672,7 @@ export function createExtrusionRouter(db: Database) {
       const prev = await getPrevExtrusionRunId(db, experimentId, run.run_order);
       const next = await getNextExtrusionRunId(db, experimentId, run.run_order);
 
-      res.render("extrusion_run_detail", {
+      res.render("extrusion/run_detail", {
         experiment,
         run,
         paramValues,
@@ -802,3 +802,4 @@ export function createExtrusionRouter(db: Database) {
 
   return router;
 }
+

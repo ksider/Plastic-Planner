@@ -13,7 +13,7 @@
         <h1><%= batch.batch_code %></h1>
       </div>
       <div class="small"><%= experiment.name %> · <%= batch.recipe_name %></div>
-      <%- include('partials/nav', { active: 'compounding' }) %>
+      <%- include('../shared/partials/nav', { active: 'compounding' }) %>
       <div style="margin-top:8px;">
         <a class="btn secondary" href="/experiments/<%= experiment.id %>">Back to experiment</a>
       </div>
@@ -107,3 +107,4 @@
     </main>
   </body>
 </html>
+

@@ -66,7 +66,7 @@ export function createImRouter(db: Database) {
   "/im",
   wrap(async (req, res) => {
     const experiments = await listImExperimentsSummary(db);
-    res.render("im_index", { experiments });
+    res.render("im/index", { experiments });
   })
 );
 
@@ -96,7 +96,7 @@ export function createImRouter(db: Database) {
           component_search: recipeSearchText(components, r),
         };
       });
-    res.render("im_new", { profiles, recipes: recipesWithComponents });
+    res.render("im/new", { profiles, recipes: recipesWithComponents });
   })
 );
 
@@ -335,7 +335,7 @@ export function createImRouter(db: Database) {
       }
       return Math.max(1, Math.round(total * recipeVariantCount));
     })();
-    res.render("im_show", {
+    res.render("im/show", {
       experiment,
       profiles,
       params,
@@ -1022,7 +1022,7 @@ export function createImRouter(db: Database) {
       };
     });
 
-    res.render("im_run_detail", {
+    res.render("im/run_detail", {
       experiment,
       run,
       recipes: await listRecipeNames(db),
@@ -1137,3 +1137,4 @@ export function createImRouter(db: Database) {
 );
   return router;
 }
+

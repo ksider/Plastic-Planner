@@ -18,7 +18,7 @@
           <span class="material-symbols-outlined">edit</span>
         </button>
       </div>
-      <%- include('partials/nav', { active: 'compounding' }) %>
+      <%- include('../shared/partials/nav', { active: 'compounding' }) %>
       <div class="small">Seed: <%= experiment.seed %> · Final mass: <%= experiment.final_mass_g %> g</div>
       <form method="POST" action="/experiments/<%= experiment.id %>/delete" onsubmit="return confirm('Delete experiment and all data?')" style="margin-top:8px;">
         <button class="btn secondary" type="submit">Delete Experiment</button>
@@ -332,3 +332,4 @@
     </main>
   </body>
 </html>
+

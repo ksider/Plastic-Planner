@@ -14,7 +14,7 @@
         <h1><%= run.run_code %></h1>
       </div>
       <div class="small"><%= experiment.name %> · <%= run.recipe_name || 'No recipe' %></div>
-      <%- include('partials/nav', { active: 'im' }) %>
+      <%- include('../shared/partials/nav', { active: 'im' }) %>
       <div style="margin-top:8px;">
         <a class="btn secondary" href="/im/<%= experiment.id %>">Back to experiment</a>
       </div>
@@ -153,3 +153,4 @@
     </main>
   </body>
 </html>
+

@@ -12,7 +12,7 @@
         <a class="back-link" href="#" data-back-link>←</a>
         <h1>New Experiment</h1>
       </div>
-      <%- include('partials/nav', { active: 'compounding' }) %>
+      <%- include('../shared/partials/nav', { active: 'compounding' }) %>
     </header>
     <main>
       <div class="card">
@@ -52,7 +52,7 @@
               <textarea name="notes" rows="2"></textarea>
             </div>
           </div>
-          <%- include('partials/recipe_select', { recipes, title: 'Select Recipes', showDescriptions: true, includeRangeCountData: true }) %>
+          <%- include('../shared/partials/recipe_select', { recipes, title: 'Select Recipes', showDescriptions: true, includeRangeCountData: true }) %>
           <button type="submit" style="margin-top:12px;" data-generate-btn disabled>Generate Table A</button>
           <div class="small" style="margin-top:6px;" data-recipe-hint>Select at least two recipes, or one recipe that has min-max.</div>
         </form>
@@ -60,3 +60,4 @@
     </main>
   </body>
 </html>
+

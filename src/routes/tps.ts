@@ -60,7 +60,7 @@ export function createTpsRouter(db: Database) {
     "/tps",
     wrap(async (_req, res) => {
       const experiments = await listTpsExperimentsSummary(db);
-      res.render("tps_index", { experiments });
+      res.render("tps/index", { experiments });
     })
   );
 
@@ -89,7 +89,7 @@ export function createTpsRouter(db: Database) {
           component_search: recipeSearchText(components, r),
         };
       });
-      res.render("tps_new", { recipes: recipesWithComponents });
+      res.render("tps/new", { recipes: recipesWithComponents });
     })
   );
 
@@ -280,7 +280,7 @@ export function createTpsRouter(db: Database) {
         return Math.max(1, Math.round(total * recipeVariantCount));
       })();
 
-      res.render("tps_show", {
+      res.render("tps/show", {
         experiment,
         params,
         availableDefs,
@@ -507,7 +507,7 @@ export function createTpsRouter(db: Database) {
       const prev = await getPrevTpsRunId(db, experimentId, run.run_order);
       const next = await getNextTpsRunId(db, experimentId, run.run_order);
 
-      res.render("tps_run_detail", {
+      res.render("tps/run_detail", {
         experiment,
         run,
         paramValues,
@@ -679,3 +679,4 @@ export function createTpsRouter(db: Database) {
 
   return router;
 }
+
