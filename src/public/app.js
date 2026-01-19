@@ -180,15 +180,48 @@ function setupRecipeSelectSearch() {
   });
 }
 
+function getRecipeType() {
+  const select = document.querySelector("[data-recipe-type]");
+  return select ? select.value : "standard";
+}
+
 function updateComponentRow(row) {
+  const nameInput = row.querySelector("input[name$='[name]']");
   const toggle = row.querySelector("[data-mode-toggle]");
-  const mode = toggle && toggle.checked ? "range" : "static";
   const modeInput = row.querySelector("[data-mode-input]");
-  if (modeInput) modeInput.value = mode;
   const staticInput = row.querySelector("[data-mode-static]");
   const minInput = row.querySelector("[data-mode-min]");
   const maxInput = row.querySelector("[data-mode-max]");
+  const splitsInput = row.querySelector("[data-splits-input]");
   if (!staticInput || !minInput || !maxInput) return;
+
+  const recipeType = getRecipeType();
+  const isPair =
+    recipeType === "paired" &&
+    nameInput &&
+    nameInput.value &&
+    nameInput.value.includes("/");
+
+  if (recipeType === "paired") {
+    if (toggle) {
+      toggle.checked = false;
+      toggle.disabled = true;
+    }
+    const mode = isPair ? "paired" : "static";
+    if (modeInput) modeInput.value = mode;
+    staticInput.disabled = isPair;
+    minInput.disabled = !isPair;
+    maxInput.disabled = !isPair;
+    staticInput.parentElement.classList.toggle("cell-disabled", isPair);
+    minInput.parentElement.classList.toggle("cell-disabled", !isPair);
+    maxInput.parentElement.classList.toggle("cell-disabled", !isPair);
+    if (splitsInput) splitsInput.disabled = !isPair;
+    return;
+  }
+
+  if (toggle) toggle.disabled = false;
+  const mode = toggle && toggle.checked ? "range" : "static";
+  if (modeInput) modeInput.value = mode;
   const isRange = mode === "range";
   staticInput.disabled = isRange;
   minInput.disabled = !isRange;
@@ -196,6 +229,7 @@ function updateComponentRow(row) {
   staticInput.parentElement.classList.toggle("cell-disabled", isRange);
   minInput.parentElement.classList.toggle("cell-disabled", !isRange);
   maxInput.parentElement.classList.toggle("cell-disabled", !isRange);
+  if (splitsInput) splitsInput.disabled = true;
 }
 
 function setupRecipeList() {
@@ -243,6 +277,7 @@ function setupRecipeSearch() {
 function setupRecipeComponents() {
   const table = document.getElementById("recipe-components");
   if (!table) return;
+  const typeSelect = document.querySelector("[data-recipe-type]");
 
   table.querySelectorAll(".component-row").forEach((row) => {
     updateComponentRow(row);
@@ -251,6 +286,17 @@ function setupRecipeComponents() {
   table.addEventListener("change", (e) => {
     const target = e.target;
     if (target && target.matches("[data-mode-toggle]")) {
+      const row = target.closest(".component-row");
+      if (row) updateComponentRow(row);
+    }
+    if (target && target.matches("input[name$='[name]']")) {
+      const row = target.closest(".component-row");
+      if (row) updateComponentRow(row);
+    }
+  });
+  table.addEventListener("input", (e) => {
+    const target = e.target;
+    if (target && target.matches("input[name$='[name]']")) {
       const row = target.closest(".component-row");
       if (row) updateComponentRow(row);
     }
@@ -282,6 +328,14 @@ function setupRecipeComponents() {
         table.setAttribute("data-next-index", String(nextIndex + 1));
         updateComponentRow(newRow);
       }
+    });
+  }
+
+  if (typeSelect) {
+    typeSelect.addEventListener("change", () => {
+      table.querySelectorAll(".component-row").forEach((row) => {
+        updateComponentRow(row);
+      });
     });
   }
 }
@@ -340,9 +394,14 @@ function setupRecipePaste() {
       const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       if (lines.length === 0) return;
       let startIdx = 0;
-      if (lines[0].indexOf("\t") === -1) {
+      const firstLine = lines[0];
+      const hasDelimiter =
+        firstLine.indexOf("\t") !== -1 ||
+        / {2,}/.test(firstLine) ||
+        /^(.*?)[ ]+(-?\d+(?:\.\d+)?(?:[ ]*-[ ]*-?\d+(?:\.\d+)?)?)$/.test(firstLine);
+      if (!hasDelimiter) {
         if (nameInput && !nameInput.value.trim()) {
-          nameInput.value = lines[0];
+          nameInput.value = firstLine;
         }
         startIdx = 1;
       }
@@ -359,7 +418,15 @@ function setupRecipePaste() {
 
       for (let i = startIdx; i < lines.length; i += 1) {
         const line = lines[i];
-        const parts = line.split(/\t+/);
+        let parts = line.split(/\t+| {2,}/);
+        if (parts.length < 2) {
+          const match = line.match(
+            /^(.*?)[ ]+(-?\d+(?:\.\d+)?(?:[ ]*-[ ]*-?\d+(?:\.\d+)?)?)$/
+          );
+          if (match) {
+            parts = [match[1], match[2]];
+          }
+        }
         if (parts.length < 2) continue;
         const comp = parts[0].trim();
         const value = parts.slice(1).join(" ").trim();
@@ -431,10 +498,12 @@ function setupExperimentValidation() {
 
   const updateState = () => {
     const selected = recipeInputs.filter((input) => input.checked);
-    const hasRange = selected.some(
-      (input) => input.getAttribute("data-has-range") === "1"
+    const hasVariants = selected.some(
+      (input) =>
+        input.getAttribute("data-has-variants") === "1" ||
+        input.getAttribute("data-has-range") === "1"
     );
-    const valid = selected.length >= 2 || (selected.length === 1 && hasRange);
+    const valid = selected.length >= 2 || (selected.length === 1 && hasVariants);
     const headTemps = parseHeadTemps();
     const variantTotal = computeVariantTotal(selected);
     const comboCount =

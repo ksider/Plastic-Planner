@@ -4,7 +4,7 @@ import {
   defaultExtrusionOutputFields,
   defaultExtrusionParamConfig,
 } from "../domain/extrusion.js";
-import { buildRecipeVariantsFromComponents } from "../domain/recipes.js";
+import { buildRecipeVariants } from "../domain/recipes.js";
 import { randomize } from "../utils.js";
 import {
   clearExtrusionRuns,
@@ -98,7 +98,7 @@ export async function generateExtrusionRuns(
   }
   const recipeVariants = recipeRows.flatMap((recipe: any) => {
     const components = componentsByRecipe.get(recipe.id) ?? [];
-    const variants = buildRecipeVariantsFromComponents(components);
+    const variants = buildRecipeVariants(recipe, components);
     return variants.map((variant) => ({
       id: recipe.id,
       name: recipe.name,

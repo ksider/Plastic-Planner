@@ -35,12 +35,16 @@
           <div class="recipe-card-grid">
             <% recipes.forEach((r) => { %>
               <% const isImported = (r.description || '').trim().toLowerCase() === 'imported from bpacks csv'; %>
-              <div class="recipe-card" data-recipe-text="<%= [r.name, r.description || '', (r.component_list || []).map((c) => c.name + ' ' + c.qty).join(' ')].join(' ').toLowerCase() %>">
+              <% const tagsText = Array.isArray(r.tags) ? r.tags.join(' ') : ''; %>
+              <div class="recipe-card" data-recipe-text="<%= [r.name, r.description || '', tagsText, (r.component_list || []).map((c) => c.name + ' ' + c.qty).join(' ')].join(' ').toLowerCase() %>">
                 <div class="recipe-card-header">
                   <h3><%= r.name %></h3>
                   <div>
                     <% if (r.has_range) { %>
                       <span class="badge">min-max</span>
+                    <% } %>
+                    <% if (tagsText) { %>
+                      <span class="badge tiny"><%= tagsText %></span>
                     <% } %>
                     <% if (isImported) { %>
                       <span class="badge imported">import</span>

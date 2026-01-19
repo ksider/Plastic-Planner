@@ -4,7 +4,7 @@ import { saveRecipeComponents } from "../domain/recipes.js";
 
 export async function listRecipes(db: Database) {
   return db.all(
-    `SELECT r.id, r.name, r.description, r.created_at,
+    `SELECT r.id, r.name, r.description, r.recipe_type, r.tags_json, r.structure_json, r.created_at,
             EXISTS(
               SELECT 1 FROM recipe_components rc
               WHERE rc.recipe_id = r.id AND rc.mode = 'range'
@@ -30,9 +30,17 @@ export async function listRecipeComponentsForRecipes(
 }
 
 export async function getRecipeById(db: Database, recipeId: number) {
-  return db.get("SELECT id, name, description FROM recipes WHERE id = ?", [
-    recipeId,
-  ]);
+  return db.get(
+    "SELECT id, name, description, recipe_type, tags_json, structure_json FROM recipes WHERE id = ?",
+    [recipeId]
+  );
+}
+
+export async function getRecipeByIdMinimal(db: Database, recipeId: number) {
+  return db.get(
+    "SELECT id, name, recipe_type, tags_json, structure_json FROM recipes WHERE id = ?",
+    [recipeId]
+  );
 }
 
 export async function getRecipeComponents(db: Database, recipeId: number) {
@@ -89,12 +97,15 @@ export async function getAllRecipes(db: Database) {
 export async function insertRecipe(
   db: Database,
   name: string,
-  description: string
+  description: string,
+  recipeType: string,
+  tagsJson: string,
+  structureJson: string | null
 ) {
   return db.run(
-    `INSERT INTO recipes (name, description, starch_parts, citric_parts, pers_parts, esbo_parts, water_parts)
-     VALUES (?, ?, 100, ?, ?, ?, ?)`,
-    [name, description, 0, 0, 0, 0]
+    `INSERT INTO recipes (name, description, recipe_type, tags_json, structure_json, starch_parts, citric_parts, pers_parts, esbo_parts, water_parts)
+     VALUES (?, ?, ?, ?, ?, 100, ?, ?, ?, ?)`,
+    [name, description, recipeType, tagsJson, structureJson, 0, 0, 0, 0]
   );
 }
 
@@ -102,13 +113,15 @@ export async function updateRecipe(
   db: Database,
   recipeId: number,
   name: string,
-  description: string
+  description: string,
+  recipeType: string,
+  tagsJson: string,
+  structureJson: string | null
 ) {
-  await db.run("UPDATE recipes SET name = ?, description = ? WHERE id = ?", [
-    name,
-    description,
-    recipeId,
-  ]);
+  await db.run(
+    "UPDATE recipes SET name = ?, description = ?, recipe_type = ?, tags_json = ?, structure_json = ? WHERE id = ?",
+    [name, description, recipeType, tagsJson, structureJson, recipeId]
+  );
 }
 
 export async function deleteRecipeComponents(db: Database, recipeId: number) {

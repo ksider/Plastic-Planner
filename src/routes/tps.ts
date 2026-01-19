@@ -18,8 +18,9 @@ import {
   parseTpsOutputFields,
 } from "../domain/tps.js";
 import {
-  buildRecipeVariantsFromComponents,
-  recipeComponentSearchText,
+  buildRecipeVariants,
+  getRecipeVariantCount,
+  recipeSearchText,
 } from "../domain/recipes.js";
 import { uniqueFieldKey } from "../domain/experiments.js";
 import { createTpsExperiment, generateTpsRuns } from "../services/tps_service.js";
@@ -50,6 +51,7 @@ import {
   upsertTpsParamConfig,
 } from "../repos/tps_repo.js";
 import { getRecipeComponentsByIds } from "../repos/experiments_repo.js";
+import { getRecipeById } from "../repos/recipes_repo.js";
 
 export function createTpsRouter(db: Database) {
   const router = express.Router();
@@ -76,12 +78,17 @@ export function createTpsRouter(db: Database) {
         list.push(row);
         componentsByRecipe.set(row.recipe_id, list);
       }
-      const recipesWithComponents = recipes.map((r: any) => ({
-        ...r,
-        component_search: recipeComponentSearchText(
-          componentsByRecipe.get(r.id) ?? []
-        ),
-      }));
+      const recipesWithComponents = recipes.map((r: any) => {
+        const components = componentsByRecipe.get(r.id) ?? [];
+        const variantCount = getRecipeVariantCount(r, components);
+        return {
+          ...r,
+          has_structure: Boolean(r.structure_json),
+          has_variants: variantCount > 1,
+          variant_count: variantCount,
+          component_search: recipeSearchText(components, r),
+        };
+      });
       res.render("tps_new", { recipes: recipesWithComponents });
     })
   );
@@ -215,10 +222,11 @@ export function createTpsRouter(db: Database) {
       }
       const recipeVariantCount = selectedRecipes.length
         ? selectedRecipes.reduce((sum: number, r: any) => {
-            const variants = buildRecipeVariantsFromComponents(
+            const count = getRecipeVariantCount(
+              r,
               componentsByRecipe.get(r.id) ?? []
             );
-            return sum + Math.max(1, variants.length);
+            return sum + Math.max(1, count);
           }, 0)
         : 1;
 
@@ -484,7 +492,8 @@ export function createTpsRouter(db: Database) {
       let recipeParts: Array<{ name: string; parts_used: number }> = [];
       if (run.recipe_id) {
         const components = await getRecipeComponentsByIds(db, [run.recipe_id]);
-        const variants = buildRecipeVariantsFromComponents(components);
+        const recipe = await getRecipeById(db, run.recipe_id);
+        const variants = buildRecipeVariants(recipe ?? {}, components);
         const match =
           run.recipe_variant !== null
             ? variants.find((v) => v.variant === run.recipe_variant)
@@ -547,16 +556,21 @@ export function createTpsRouter(db: Database) {
       const updated = fields.map((f) => {
         if (f.key !== key) return f;
         const label = String(req.body.label || f.label).trim() || f.label;
+        const typeRaw = typeof req.body.type === "string" ? req.body.type : "";
         const type =
-          req.body.type === "number" ? "number" : req.body.type === "tags" ? "tags" : "text";
+          typeRaw === "number" ? "number" : typeRaw === "tags" ? "tags" : "text";
+        const nextType =
+          f.is_default || !typeRaw
+            ? f.type
+            : type;
         const options =
-          type === "tags"
+          nextType === "tags"
             ? String(req.body.options || "")
                 .split(",")
                 .map((o) => o.trim())
                 .filter(Boolean)
             : [];
-        return { ...f, label, type, options };
+        return { ...f, label, type: nextType, options };
       });
       await updateTpsExperimentOutputFields(db, experimentId, JSON.stringify(updated));
       res.redirect(`/tps/${experimentId}#tab-tps-runs`);

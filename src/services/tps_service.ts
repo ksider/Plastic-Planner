@@ -2,7 +2,7 @@ import type { Database } from "sqlite";
 import { AppError } from "../lib/errors.js";
 import { randomize } from "../utils.js";
 import { defaultTpsOutputFields, defaultTpsParamConfig } from "../domain/tps.js";
-import { buildRecipeVariantsFromComponents } from "../domain/recipes.js";
+import { buildRecipeVariants } from "../domain/recipes.js";
 import {
   clearTpsRuns,
   insertTpsExperiment,
@@ -95,7 +95,7 @@ export async function generateTpsRuns(
   }
   const recipeVariants = recipeRows.flatMap((recipe: any) => {
     const components = componentsByRecipe.get(recipe.id) ?? [];
-    const variants = buildRecipeVariantsFromComponents(components);
+    const variants = buildRecipeVariants(recipe, components);
     return variants.map((variant) => ({
       id: recipe.id,
       name: recipe.name,

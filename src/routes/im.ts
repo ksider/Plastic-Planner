@@ -15,10 +15,7 @@ import {
 import { mean, sd, slugify, toCsv } from "../utils.js";
 import type { ImParamDef } from "../types.js";
 import { createImExperiment, generateImRuns } from "../services/im_service.js";
-import {
-  buildRecipeVariantsFromComponents,
-  recipeComponentSearchText,
-} from "../domain/recipes.js";
+import { getRecipeVariantCount, recipeSearchText } from "../domain/recipes.js";
 import { getRecipeComponentsByIds } from "../repos/experiments_repo.js";
 import {
   deactivateImParamConfig,
@@ -88,12 +85,17 @@ export function createImRouter(db: Database) {
       list.push(row);
       componentsByRecipe.set(row.recipe_id, list);
     }
-    const recipesWithComponents = recipes.map((r: any) => ({
-      ...r,
-      component_search: recipeComponentSearchText(
-        componentsByRecipe.get(r.id) ?? []
-      ),
-    }));
+      const recipesWithComponents = recipes.map((r: any) => {
+        const components = componentsByRecipe.get(r.id) ?? [];
+        const variantCount = getRecipeVariantCount(r, components);
+        return {
+          ...r,
+          has_structure: Boolean(r.structure_json),
+          has_variants: variantCount > 1,
+          variant_count: variantCount,
+          component_search: recipeSearchText(components, r),
+        };
+      });
     res.render("im_new", { profiles, recipes: recipesWithComponents });
   })
 );
@@ -238,10 +240,11 @@ export function createImRouter(db: Database) {
     }
     const recipeVariantCount = selectedRecipes.length
       ? selectedRecipes.reduce((sum: number, r: any) => {
-          const variants = buildRecipeVariantsFromComponents(
+          const count = getRecipeVariantCount(
+            r,
             componentsByRecipe.get(r.id) ?? []
           );
-          return sum + Math.max(1, variants.length);
+          return sum + Math.max(1, count);
         }, 0)
       : 1;
     const runs = await listImRuns(db, experimentId);

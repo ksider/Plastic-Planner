@@ -18,7 +18,7 @@ import {
   parseSampleFields,
   uniqueFieldKey,
 } from "../domain/experiments.js";
-import { recipeComponentSearchText } from "../domain/recipes.js";
+import { getRecipeVariantCount, recipeSearchText } from "../domain/recipes.js";
 import { createExperimentWithBatches, generateMoldingSamples } from "../services/experiments_service.js";
 import { parseNumber, toCsv } from "../utils.js";
 import {
@@ -83,12 +83,17 @@ export function createExperimentsRouter(db: Database) {
         list.push(row);
         componentsByRecipe.set(row.recipe_id, list);
       }
-      const recipesWithComponents = recipes.map((r: any) => ({
-        ...r,
-        component_search: recipeComponentSearchText(
-          componentsByRecipe.get(r.id) ?? []
-        ),
-      }));
+      const recipesWithComponents = recipes.map((r: any) => {
+        const components = componentsByRecipe.get(r.id) ?? [];
+        const variantCount = getRecipeVariantCount(r, components);
+        return {
+          ...r,
+          has_structure: Boolean(r.structure_json),
+          has_variants: variantCount > 1,
+          variant_count: variantCount,
+          component_search: recipeSearchText(components, r),
+        };
+      });
       res.render("experiment_new", { recipes: recipesWithComponents });
     })
   );
@@ -454,7 +459,8 @@ export function createExperimentsRouter(db: Database) {
   wrap(async (req, res) => {
     const experimentId = Number(req.params.id);
     const label = String(req.body.label || "").trim();
-    const type = String(req.body.type || "text");
+    const typeRaw = typeof req.body.type === "string" ? req.body.type : "";
+    const type = typeRaw || "text";
     const optionsRaw = String(req.body.options || "").trim();
     if (!label) return res.status(400).send("Field name required");
 
@@ -504,7 +510,14 @@ export function createExperimentsRouter(db: Database) {
               .map((t) => t.trim())
               .filter((t) => t)
           : [];
-      const nextType = f.is_core ? f.type : type === "number" ? "number" : type === "tags" ? "tags" : "text";
+      const nextType =
+        f.is_core || f.is_default || !typeRaw
+          ? f.type
+          : type === "number"
+          ? "number"
+          : type === "tags"
+          ? "tags"
+          : "text";
       return {
         ...f,
         label,

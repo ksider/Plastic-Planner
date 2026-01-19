@@ -1,7 +1,7 @@
 import type { Database } from "sqlite";
 import { AppError } from "../lib/errors.js";
 import { getImDefaultConfig } from "../domain/im.js";
-import { buildRecipeVariantsFromComponents } from "../domain/recipes.js";
+import { buildRecipeVariants } from "../domain/recipes.js";
 import { randomize } from "../utils.js";
 import {
   clearImRuns,
@@ -114,7 +114,7 @@ export async function generateImRuns(
   }
   const recipeVariants = recipeRows.flatMap((recipe: any) => {
     const components = componentsByRecipe.get(recipe.id) ?? [];
-    const variants = buildRecipeVariantsFromComponents(components);
+    const variants = buildRecipeVariants(recipe, components);
     return variants.map((variant) => ({
       id: recipe.id,
       name: recipe.name,

@@ -9,8 +9,12 @@ import type { BpacksComponentRow, BpacksRecipeColumn } from "../bpacks_import.js
 import { wrap } from "../lib/http.js";
 import { withTransaction } from "../tx.js";
 import {
+  buildStructureFromPairedComponents,
   defaultRecipeComponents,
   normalizeComponents,
+  parseTagsJson,
+  normalizeTagsInput,
+  parseStructureDefinition,
   saveRecipeComponents,
 } from "../domain/recipes.js";
 import type { RecipeComponentInput } from "../types.js";
@@ -81,7 +85,13 @@ export function createRecipesRouter(db: Database) {
             }
             return { name: c.name, qty: "" };
           });
-        return { ...r, component_list: displayList, component_has_more: false };
+        const tags = parseTagsJson(r.tags_json);
+        return {
+          ...r,
+          tags,
+          component_list: displayList,
+          component_has_more: false,
+        };
       });
       res.render("recipes_index", {
         recipes: recipesWithComponents,
@@ -182,7 +192,10 @@ export function createRecipesRouter(db: Database) {
             const result = await insertRecipe(
               db,
               recipe.name,
-              "Imported from BPACKs CSV"
+              "Imported from BPACKs CSV",
+              "standard",
+              "[]",
+              null
             );
             recipeId = result.lastID as number;
             created += 1;
@@ -227,14 +240,47 @@ export function createRecipesRouter(db: Database) {
     wrap(async (req, res) => {
       const name = String(req.body.name || "").trim();
       const description = String(req.body.description || "").trim();
+      const recipeType = String(req.body.recipe_type || "standard").trim();
+      const tagsInput = String(req.body.tags || "").trim();
+      const structureInput = String(req.body.structure_json || "").trim();
       const components = normalizeComponents(req.body.components);
+      const tags = normalizeTagsInput(tagsInput);
+      const structure =
+        structureInput.length > 0 ? parseStructureDefinition(structureInput) : null;
+      const pairedStructure =
+        recipeType === "paired"
+          ? buildStructureFromPairedComponents(components)
+          : null;
 
       if (!name || components.length === 0) {
         return res.status(400).send("Invalid recipe inputs");
       }
+      if (structureInput.length > 0 && !structure) {
+        return res.status(400).send("Invalid structure JSON");
+      }
+      if (recipeType === "paired" && !pairedStructure) {
+        return res.status(400).send("Paired recipe requires components like A/B");
+      }
+      if ((structure || pairedStructure) && !tags.includes("structure")) {
+        tags.push("structure");
+      }
+      if (recipeType === "paired" && !tags.includes("paired")) {
+        tags.push("paired");
+      }
 
       await withTransaction(db, async () => {
-        const expResult = await insertRecipe(db, name, description);
+        const expResult = await insertRecipe(
+          db,
+          name,
+          description,
+          recipeType,
+          JSON.stringify(tags),
+          recipeType === "paired"
+            ? JSON.stringify(pairedStructure)
+            : structureInput.length > 0
+            ? structureInput
+            : null
+        );
         const recipeId = expResult.lastID as number;
         await saveRecipeComponents(db, recipeId, components);
       });
@@ -290,14 +336,48 @@ export function createRecipesRouter(db: Database) {
       const recipeId = Number(req.params.id);
       const name = String(req.body.name || "").trim();
       const description = String(req.body.description || "").trim();
+      const recipeType = String(req.body.recipe_type || "standard").trim();
+      const tagsInput = String(req.body.tags || "").trim();
+      const structureInput = String(req.body.structure_json || "").trim();
       const components = normalizeComponents(req.body.components);
+      const tags = normalizeTagsInput(tagsInput);
+      const structure =
+        structureInput.length > 0 ? parseStructureDefinition(structureInput) : null;
+      const pairedStructure =
+        recipeType === "paired"
+          ? buildStructureFromPairedComponents(components)
+          : null;
 
       if (!name || components.length === 0) {
         return res.status(400).send("Invalid recipe inputs");
       }
+      if (structureInput.length > 0 && !structure) {
+        return res.status(400).send("Invalid structure JSON");
+      }
+      if (recipeType === "paired" && !pairedStructure) {
+        return res.status(400).send("Paired recipe requires components like A/B");
+      }
+      if ((structure || pairedStructure) && !tags.includes("structure")) {
+        tags.push("structure");
+      }
+      if (recipeType === "paired" && !tags.includes("paired")) {
+        tags.push("paired");
+      }
 
       await withTransaction(db, async () => {
-        await updateRecipe(db, recipeId, name, description);
+        await updateRecipe(
+          db,
+          recipeId,
+          name,
+          description,
+          recipeType,
+          JSON.stringify(tags),
+          recipeType === "paired"
+            ? JSON.stringify(pairedStructure)
+            : structureInput.length > 0
+            ? structureInput
+            : null
+        );
         await deleteRecipeComponents(db, recipeId);
         await saveRecipeComponents(db, recipeId, components);
       });

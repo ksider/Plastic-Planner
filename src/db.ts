@@ -14,6 +14,9 @@ async function init(): Promise<Database> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       description TEXT,
+      recipe_type TEXT NOT NULL DEFAULT 'standard',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      structure_json TEXT,
       starch_parts REAL NOT NULL DEFAULT 100,
       citric_parts REAL NOT NULL,
       pers_parts REAL NOT NULL,
@@ -451,6 +454,20 @@ async function init(): Promise<Database> {
     if (!imParamColumnNames.has("options_json")) {
       await db.exec("ALTER TABLE im_param_definitions ADD COLUMN options_json TEXT");
     }
+  }
+
+  const recipeColumns = await db.all<{ name: string }>(
+    "PRAGMA table_info(recipes)"
+  );
+  const recipeColumnNames = new Set(recipeColumns.map((c) => c.name));
+  if (!recipeColumnNames.has("tags_json")) {
+    await db.exec("ALTER TABLE recipes ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!recipeColumnNames.has("structure_json")) {
+    await db.exec("ALTER TABLE recipes ADD COLUMN structure_json TEXT");
+  }
+  if (!recipeColumnNames.has("recipe_type")) {
+    await db.exec("ALTER TABLE recipes ADD COLUMN recipe_type TEXT NOT NULL DEFAULT 'standard'");
   }
 
   const recipeCount = (await db.get<{ count: number }>(

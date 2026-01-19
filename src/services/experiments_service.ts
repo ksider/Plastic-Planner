@@ -1,7 +1,7 @@
 import type { Database } from "sqlite";
 import { AppError } from "../lib/errors.js";
 import { defaultSampleFields } from "../domain/experiments.js";
-import { buildRecipeVariantsFromComponents, defaultRecipeComponents } from "../domain/recipes.js";
+import { buildRecipeVariants, defaultRecipeComponents } from "../domain/recipes.js";
 import { computeWeights, randomize, slugify } from "../utils.js";
 import {
   getRecipeComponentsByIds,
@@ -63,7 +63,7 @@ export async function createExperimentWithBatches(
 
   const recipeVariants = recipes.flatMap((recipe) => {
     const components = componentsByRecipe.get(recipe.id) ?? [];
-    const variants = buildRecipeVariantsFromComponents(components);
+    const variants = buildRecipeVariants(recipe, components);
     return variants.map((variant) => ({
       ...recipe,
       variant: variant.variant,

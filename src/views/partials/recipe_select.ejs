@@ -15,12 +15,15 @@
       <% const componentText = (r.component_search || '').trim(); %>
       <% const isImported = descText.toLowerCase() === 'imported from bpacks csv'; %>
       <button type="button" class="recipe-select-card" data-recipe-pill data-recipe-text="<%= [r.name, descText, componentText].join(' ').toLowerCase() %>">
-        <input type="checkbox" name="recipe_ids" value="<%= r.id %>" data-has-range="<%= r.has_range ? '1' : '0' %>" <%= includeRangeCount ? `data-variant-count=\"${r.range_count ? Math.pow(2, r.range_count) : 1}\"` : '' %> />
+        <input type="checkbox" name="recipe_ids" value="<%= r.id %>" data-has-range="<%= r.has_range ? '1' : '0' %>" data-has-variants="<%= r.has_variants ? '1' : '0' %>" data-has-structure="<%= r.has_structure ? '1' : '0' %>" <%= includeRangeCount ? `data-variant-count=\"${r.variant_count || 1}\"` : '' %> />
         <div class="recipe-select-header">
           <div class="recipe-select-title"><%= r.name %></div>
           <div class="recipe-select-badges">
             <% if (r.has_range) { %>
               <span class="badge">min-max</span>
+            <% } %>
+            <% if (r.has_structure) { %>
+              <span class="badge">structure</span>
             <% } %>
             <% if (showDesc && isImported) { %>
               <span class="badge tiny">Imported</span>

@@ -2,7 +2,7 @@ import type { Database } from "sqlite";
 
 export async function listRecipesForExperimentNew(db: Database) {
   return db.all(
-    `SELECT r.id, r.name, r.description,
+    `SELECT r.id, r.name, r.description, r.recipe_type, r.tags_json, r.structure_json,
             EXISTS(
               SELECT 1 FROM recipe_components rc
               WHERE rc.recipe_id = r.id AND rc.mode = 'range'
@@ -48,7 +48,7 @@ export async function insertExperiment(
 export async function getRecipesByIds(db: Database, recipeIds: number[]) {
   const placeholders = recipeIds.map(() => "?").join(",");
   return db.all(
-    `SELECT id, name FROM recipes WHERE id IN (${placeholders})`,
+    `SELECT id, name, recipe_type, tags_json, structure_json FROM recipes WHERE id IN (${placeholders})`,
     recipeIds
   );
 }

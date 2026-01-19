@@ -12,7 +12,7 @@ export async function listExtrusionExperimentsSummary(db: Database) {
 
 export async function listRecipeNames(db: Database) {
   return db.all(
-    `SELECT r.id, r.name, r.description,
+    `SELECT r.id, r.name, r.description, r.recipe_type, r.tags_json, r.structure_json,
             EXISTS(
               SELECT 1 FROM recipe_components rc
               WHERE rc.recipe_id = r.id AND rc.mode = 'range'
@@ -61,7 +61,7 @@ export async function listExtrusionExperimentRecipes(
   experimentId: number
 ) {
   return db.all(
-    `SELECT r.id, r.name,
+    `SELECT r.id, r.name, r.recipe_type, r.tags_json, r.structure_json,
             EXISTS(
               SELECT 1 FROM recipe_components rc
               WHERE rc.recipe_id = r.id AND rc.mode = 'range'

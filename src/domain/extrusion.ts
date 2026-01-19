@@ -50,7 +50,7 @@ export function mergeExtrusionDefaultFields(
   for (const def of defaults) {
     const existing = map.get(def.key);
     if (existing) {
-      merged.push({ ...def, ...existing, is_default: true });
+      merged.push({ ...def, ...existing, type: def.type, is_default: true });
       map.delete(def.key);
     } else {
       merged.push(def);

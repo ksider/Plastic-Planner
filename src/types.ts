@@ -5,6 +5,7 @@ export type RecipeComponentInput = {
   parts_min: number | null;
   parts_max: number | null;
   is_locked: number;
+  splits?: string | null;
 };
 
 export type SampleFieldDef = {

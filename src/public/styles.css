@@ -133,7 +133,6 @@ button.secondary, .btn.secondary {
 table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 900px;
 }
 
 table th, table td {
@@ -755,6 +754,21 @@ table tbody tr:hover {
 .settings-col {
   display: grid;
   gap: 8px;
+}
+
+.settings-grid .settings-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.settings-grid .settings-table th,
+.settings-grid .settings-table td {
+  word-break: break-word;
+}
+
+.settings-grid .settings-table th:last-child,
+.settings-grid .settings-table td:last-child {
+  width: 120px;
 }
 
 .recipe-title {
