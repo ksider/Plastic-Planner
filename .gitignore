@@ -3,6 +3,7 @@ node_modules
 doe.sqlite
 .DS_Store
 Thumbs.db
+desktop.ini
 .env
 .env.*
 .npm
