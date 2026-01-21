@@ -14,7 +14,7 @@
       <% const descText = (r.description || '').trim(); %>
       <% const componentText = (r.component_search || '').trim(); %>
       <% const isImported = descText.toLowerCase() === 'imported from bpacks csv'; %>
-      <button type="button" class="recipe-select-card" data-recipe-pill data-recipe-text="<%= [r.name, descText, componentText].join(' ').toLowerCase() %>">
+      <label class="recipe-select-card" data-recipe-pill data-recipe-text="<%= [r.name, descText, componentText].join(' ').toLowerCase() %>">
         <input type="checkbox" name="recipe_ids" value="<%= r.id %>" data-has-range="<%= r.has_range ? '1' : '0' %>" data-has-variants="<%= r.has_variants ? '1' : '0' %>" data-has-structure="<%= r.has_structure ? '1' : '0' %>" <%= includeRangeCount ? `data-variant-count=\"${r.variant_count || 1}\"` : '' %> />
         <div class="recipe-select-header">
           <div class="recipe-select-title"><%= r.name %></div>
@@ -34,8 +34,7 @@
           <div class="recipe-select-desc" title="<%= descText %>"><%= descText %></div>
         <% } %>
         <span class="recipe-select-hidden" aria-hidden="true"><%= [r.name, descText, componentText].join(' ') %></span>
-      </button>
+      </label>
     <% }) %>
   </div>
 </div>
-

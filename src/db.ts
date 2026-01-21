@@ -124,6 +124,7 @@ async function init(): Promise<Database> {
       default_material_moisture_pct REAL,
       default_material_density_g_cm3 REAL,
       notes TEXT,
+      design_mode TEXT NOT NULL DEFAULT 'FULL',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (machine_profile_id) REFERENCES im_machine_profiles(id)
     );
@@ -384,6 +385,16 @@ async function init(): Promise<Database> {
   }
   if (!experimentColumnNames.has("notes")) {
     await db.exec("ALTER TABLE experiments ADD COLUMN notes TEXT");
+  }
+
+  const imExperimentColumns = await db.all<{ name: string }>(
+    "PRAGMA table_info(im_experiments)"
+  );
+  const imExperimentColumnNames = new Set(imExperimentColumns.map((c) => c.name));
+  if (!imExperimentColumnNames.has("design_mode")) {
+    await db.exec(
+      "ALTER TABLE im_experiments ADD COLUMN design_mode TEXT NOT NULL DEFAULT 'FULL'"
+    );
   }
 
   const sampleColumns = await db.all<{ name: string }>(

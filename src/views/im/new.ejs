@@ -43,6 +43,13 @@
               <label>Default material density (g/cm3)</label>
               <input name="default_material_density_g_cm3" type="number" step="0.001" inputmode="decimal" />
             </div>
+            <div>
+              <label>Design</label>
+              <select name="design_mode">
+                <option value="FULL">Full factorial</option>
+                <option value="BBD">Box–Behnken</option>
+              </select>
+            </div>
           </div>
 
           <%- include('../shared/partials/recipe_select', { recipes, title: 'Recipes for this experiment' }) %>
@@ -55,4 +62,3 @@
     </main>
   </body>
 </html>
-

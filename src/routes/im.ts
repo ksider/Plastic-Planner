@@ -109,6 +109,8 @@ export function createImRouter(db: Database) {
     const moisture = parseNumberFlexible(req.body.default_material_moisture_pct);
     const density = parseNumberFlexible(req.body.default_material_density_g_cm3);
     const notes = String(req.body.notes || "").trim() || null;
+    const designMode =
+      String(req.body.design_mode || "").toUpperCase() === "BBD" ? "BBD" : "FULL";
     const recipeIds = Array.isArray(req.body.recipe_ids)
       ? req.body.recipe_ids.map((v: string) => Number(v)).filter(Number.isFinite)
       : req.body.recipe_ids
@@ -131,6 +133,7 @@ export function createImRouter(db: Database) {
       density,
       notes,
       recipeIds,
+      designMode,
     });
 
     res.redirect(`/im/${experimentId}`);
@@ -592,8 +595,14 @@ export function createImRouter(db: Database) {
     const maxRunsRaw = Number(req.body.max_runs || 32);
     const maxRuns =
       Number.isFinite(maxRunsRaw) && maxRunsRaw > 0 ? maxRunsRaw : 32;
+    const design =
+      String(req.body.design || "").toUpperCase() === "BBD" ? "BBD" : "FULL";
 
-    const { warning } = await generateImRuns(db, { experimentId, maxRuns });
+    await db.run("UPDATE im_experiments SET design_mode = ? WHERE id = ?", [
+      design,
+      experimentId,
+    ]);
+    const { warning } = await generateImRuns(db, { experimentId, maxRuns, design });
 
     const warnQuery = warning ? `?warning=${encodeURIComponent(warning)}` : "";
     res.redirect(`/im/${experimentId}${warnQuery}#tab-im-runs`);
@@ -1137,4 +1146,3 @@ export function createImRouter(db: Database) {
 );
   return router;
 }
-

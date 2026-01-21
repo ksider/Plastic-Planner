@@ -35,13 +35,14 @@ export async function insertImExperiment(
   seed: number,
   moisture: number | null,
   density: number | null,
-  notes: string | null
+  notes: string | null,
+  designMode: string
 ) {
   return db.run(
     `INSERT INTO im_experiments
-      (name, machine_profile_id, seed, default_material_moisture_pct, default_material_density_g_cm3, notes)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [name, machineProfileId, seed, moisture, density, notes]
+      (name, machine_profile_id, seed, default_material_moisture_pct, default_material_density_g_cm3, notes, design_mode)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [name, machineProfileId, seed, moisture, density, notes, designMode]
   );
 }
 

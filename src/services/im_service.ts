@@ -29,6 +29,7 @@ export async function createImExperiment(
     density: number | null;
     notes: string | null;
     recipeIds: number[];
+    designMode?: string;
   }
 ) {
   const { name, machineProfileId, seed, moisture, density, notes, recipeIds } =
@@ -50,7 +51,8 @@ export async function createImExperiment(
       seed,
       moisture,
       density,
-      notes
+      notes,
+      input.designMode === "BBD" ? "BBD" : "FULL"
     );
     experimentId = result.lastID as number;
 
@@ -82,9 +84,10 @@ export async function generateImRuns(
   input: {
     experimentId: number;
     maxRuns: number;
+    design?: "FULL" | "BBD";
   }
 ) {
-  const { experimentId, maxRuns } = input;
+  const { experimentId, maxRuns, design } = input;
   const experiment = await getImExperimentSeedAndDefaults(db, experimentId);
   if (!experiment) {
     throw new AppError({
@@ -141,23 +144,94 @@ export async function generateImRuns(
       } else if (c.mode === "FIXED" && c.fixed_value !== null) {
         levels = [c.fixed_value];
       }
-      return { param_def_id: c.param_def_id, code: c.code, levels };
+      return { param_def_id: c.param_def_id, code: c.code, levels, config: c };
     })
     .filter((p: any) => p.levels.length > 0);
 
-  let combos: Array<Record<number, number>> = [{}];
-  for (const p of paramLevels) {
-    const next: Array<Record<number, number>> = [];
-    for (const base of combos) {
-      for (const level of p.levels) {
-        next.push({ ...base, [p.param_def_id]: level });
+  let combos: Array<Record<number, number>> = [];
+  let warning = "";
+
+  if (design === "BBD") {
+    const fixedEntries: Array<[number, number]> = [];
+    const factors: Array<{
+      param_def_id: number;
+      low: number;
+      high: number;
+      center: number;
+    }> = [];
+
+    for (const p of paramLevels) {
+      const levels = [...p.levels].filter((v) => Number.isFinite(v));
+      const unique = Array.from(new Set(levels));
+      if (unique.length === 1) {
+        fixedEntries.push([p.param_def_id, unique[0]]);
+        continue;
       }
+      if (p.config?.mode === "RANGE" && p.config.range_min !== null && p.config.range_max !== null) {
+        const low = Number(p.config.range_min);
+        const high = Number(p.config.range_max);
+        const center = (low + high) / 2;
+        factors.push({ param_def_id: p.param_def_id, low, high, center });
+        continue;
+      }
+      if (p.config?.mode === "LIST") {
+        const sorted = [...unique].sort((a, b) => a - b);
+        const low = sorted[0];
+        const high = sorted[sorted.length - 1];
+        const center = sorted[Math.floor(sorted.length / 2)] ?? (low + high) / 2;
+        factors.push({ param_def_id: p.param_def_id, low, high, center });
+        continue;
+      }
+      fixedEntries.push([p.param_def_id, unique[0]]);
     }
-    combos = next;
+
+    if (factors.length < 3) {
+      warning = "Box–Behnken requires at least 3 varying factors; using full factorial instead.";
+    } else {
+      for (let i = 0; i < factors.length - 1; i += 1) {
+        for (let j = i + 1; j < factors.length; j += 1) {
+          const fi = factors[i];
+          const fj = factors[j];
+          const levelsI = [fi.low, fi.high];
+          const levelsJ = [fj.low, fj.high];
+          for (const a of levelsI) {
+            for (const b of levelsJ) {
+              const combo: Record<number, number> = {};
+              factors.forEach((f) => {
+                combo[f.param_def_id] = f.center;
+              });
+              combo[fi.param_def_id] = a;
+              combo[fj.param_def_id] = b;
+              fixedEntries.forEach(([id, value]) => {
+                combo[id] = value;
+              });
+              combos.push(combo);
+            }
+          }
+        }
+      }
+      const centerCombo: Record<number, number> = {};
+      factors.forEach((f) => {
+        centerCombo[f.param_def_id] = f.center;
+      });
+      fixedEntries.forEach(([id, value]) => {
+        centerCombo[id] = value;
+      });
+      combos.push(centerCombo);
+    }
   }
 
   if (combos.length === 0) {
     combos = [{}];
+    for (const p of paramLevels) {
+      const next: Array<Record<number, number>> = [];
+      for (const base of combos) {
+        for (const level of p.levels) {
+          next.push({ ...base, [p.param_def_id]: level });
+        }
+      }
+      combos = next;
+    }
   }
 
   if (recipeVariants.length > 0) {
@@ -174,11 +248,11 @@ export async function generateImRuns(
     combos = expanded;
   }
 
-  let warning = "";
   if (combos.length > maxRuns) {
     const total = combos.length;
     combos = randomize(combos, experiment.seed).slice(0, maxRuns);
-    warning = `Too many combinations (${total}); sampled ${maxRuns}.`;
+    const warningMsg = `Too many combinations (${total}); sampled ${maxRuns}.`;
+    warning = warning ? `${warning} ${warningMsg}` : warningMsg;
   }
 
   const randomized = randomize(combos, experiment.seed);

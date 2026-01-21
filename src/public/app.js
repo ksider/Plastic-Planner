@@ -241,9 +241,11 @@ function setupRecipeList() {
         pill.classList.toggle("active", input.checked);
       };
       sync();
-      pill.addEventListener("click", () => {
+      input.addEventListener("change", sync);
+      pill.addEventListener("click", (event) => {
+        if (event.target === input) return;
+        if (pill.tagName === "LABEL") return;
         input.checked = !input.checked;
-        sync();
         input.dispatchEvent(new Event("change", { bubbles: true }));
       });
     });

@@ -211,6 +211,7 @@ function parseListValues(text) {
 
 function computeMaxRunsFromParams() {
   let total = 1;
+  let varyingFactors = 0;
   document.querySelectorAll("tr[data-param-row]").forEach((row) => {
     const active = row.querySelector('input[type="checkbox"]')?.checked;
     if (!active) return;
@@ -228,6 +229,7 @@ function computeMaxRunsFromParams() {
     } else if (mode === "FIXED") {
       levels = fixed !== "" ? 1 : 1;
     }
+    if (levels > 1) varyingFactors += 1;
     total *= levels;
   });
   const recipeCount = (() => {
@@ -236,6 +238,12 @@ function computeMaxRunsFromParams() {
     const count = Number(el.getAttribute("data-recipe-count") || "1");
     return Number.isFinite(count) && count > 0 ? count : 1;
   })();
+  const designSelect = document.querySelector('select[name="design"]');
+  const design = designSelect ? String(designSelect.value || "FULL") : "FULL";
+  if (design === "BBD" && varyingFactors >= 3) {
+    const base = 2 * varyingFactors * (varyingFactors - 1) + 1;
+    return Math.max(1, Math.round(base * recipeCount));
+  }
   return Math.max(1, Math.round(total * recipeCount));
 }
 
@@ -257,7 +265,10 @@ function setupMaxRunsAuto() {
   });
   document.addEventListener("change", (event) => {
     const target = event.target;
-    if (target instanceof HTMLElement && target.closest("tr[data-param-row]")) {
+    if (
+      target instanceof HTMLElement &&
+      (target.closest("tr[data-param-row]") || target.closest('select[name="design"]'))
+    ) {
       update();
     }
   });

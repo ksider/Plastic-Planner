@@ -283,6 +283,13 @@
               <input name="max_runs" type="number" min="1" value="<%= maxRunsDefault || 32 %>" data-max-runs-input data-auto="1" />
               <div class="small" data-max-runs-label></div>
             </div>
+            <div>
+              <label>Design</label>
+              <select name="design">
+                <option value="FULL" <%= experiment.design_mode === 'FULL' ? 'selected' : '' %>>Full factorial</option>
+                <option value="BBD" <%= experiment.design_mode === 'BBD' ? 'selected' : '' %>>Box–Behnken</option>
+              </select>
+            </div>
             <button type="submit">Generate runs</button>
           </form>
           <div style="display:flex; gap:8px; margin-top:12px;">
@@ -342,4 +349,3 @@
     </main>
   </body>
 </html>
-
