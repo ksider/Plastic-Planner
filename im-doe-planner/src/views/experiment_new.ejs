@@ -1,0 +1,116 @@
+<%- include('partials/head', { title: 'IM-DOE Planner | New Experiment' }) %>
+<%- include('partials/nav') %>
+<div class="container">
+  <div class="card">
+    <h1 class="card-title">Create Experiment</h1>
+    <form class="pure-form pure-form-stacked" action="/experiments" method="post">
+      <div class="form-grid">
+        <div>
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required>
+        </div>
+        <div>
+          <label for="design_type">Design Type</label>
+          <select id="design_type" name="design_type">
+            <option value="BBD">BBD (Box-Behnken)</option>
+            <option value="FFA">FFA (Full Factorial)</option>
+            <option value="SCREEN">SCREEN (Sampled Factorial)</option>
+            <option value="SIM">SIM (Grid)</option>
+          </select>
+        </div>
+        <div>
+          <label for="seed">Seed</label>
+          <input type="number" id="seed" name="seed" value="42">
+        </div>
+        <div>
+          <label for="center_points">Center Points (BBD)</label>
+          <input type="number" id="center_points" name="center_points" value="3">
+        </div>
+        <div>
+          <label for="max_runs">Max Runs</label>
+          <input type="number" id="max_runs" name="max_runs" value="200">
+        </div>
+        <div>
+          <label for="replicate_count">Replicates</label>
+          <input type="number" id="replicate_count" name="replicate_count" value="1">
+        </div>
+        <div>
+          <label>Recipe Block</label>
+          <label class="pure-checkbox">
+            <input type="checkbox" name="recipe_as_block" value="1"> Use recipe as block (duplicate design per recipe)
+          </label>
+        </div>
+        <div>
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes"></textarea>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1rem;">
+        <div class="recipes-header">
+          <div>
+            <h3 class="card-title">Recipes for this experiment</h3>
+          </div>
+          <div class="recipes-actions">
+            <input type="search" class="recipe-search" placeholder="Search recipes..." data-recipe-search>
+          </div>
+        </div>
+        <% if (recipes.length === 0) { %>
+          <p class="small-note">No recipes yet. Import on the Recipes page.</p>
+        <% } else { %>
+          <div class="recipe-select-grid">
+            <% recipes.forEach((recipe) => { %>
+              <% const dataText = [recipe.name, recipe.description || '', ...(recipe.components || []).map((c) => `${c.component_name} ${c.phr}`)].join(' ').toLowerCase(); %>
+              <label class="recipe-select-card" data-recipe-text="<%= dataText %>">
+                <input type="checkbox" name="recipe_ids" value="<%= recipe.id %>">
+                <div class="recipe-select-header">
+                  <div class="recipe-select-title"><%= recipe.name %></div>
+                  <% if (recipe.description) { %>
+                    <div class="recipe-select-desc"><%= recipe.description %></div>
+                  <% } %>
+                </div>
+                <div class="recipe-components">
+                  <% const comps = recipe.components || []; %>
+                  <% comps.slice(0, 6).forEach((component) => { %>
+                    <div class="recipe-comp-line">
+                      <span class="recipe-comp-name"><%= component.component_name %></span>
+                      <span class="recipe-comp-qty"><%= formatNumber(component.phr) %></span>
+                    </div>
+                  <% }); %>
+                  <% if (comps.length > 6) { %>
+                    <div class="recipe-comp-more">+<%= comps.length - 6 %> more</div>
+                  <% } %>
+                </div>
+              </label>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <button class="pure-button pure-button-primary" type="submit">Create Experiment</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/foot') %>
+
+<script>
+  document.querySelectorAll('.recipe-select-card').forEach((card) => {
+    const input = card.querySelector('input[type="checkbox"]');
+    if (!input) return;
+    card.classList.toggle('active', input.checked);
+    input.addEventListener('change', () => {
+      card.classList.toggle('active', input.checked);
+    });
+  });
+
+  const searchInput = document.querySelector('[data-recipe-search]');
+  if (searchInput) {
+    searchInput.addEventListener('input', (event) => {
+      const query = event.target.value.toLowerCase();
+      document.querySelectorAll('[data-recipe-text]').forEach((card) => {
+        const text = card.getAttribute('data-recipe-text') || '';
+        card.style.display = text.includes(query) ? '' : 'none';
+      });
+    });
+  }
+</script>

@@ -1,0 +1,47 @@
+<%- include('partials/head', { title: 'IM-DOE Planner | Experiments' }) %>
+<%- include('partials/nav') %>
+<div class="container">
+  <div class="card">
+    <h1 class="card-title">Experiments</h1>
+    <p class="small-note">Design, run, and analyze injection molding DOE plans.</p>
+    <a class="pure-button pure-button-primary" href="/experiments/new">Create Experiment</a>
+  </div>
+
+  <div class="card">
+    <h2 class="card-title">Recent</h2>
+    <table class="pure-table table-compact">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Design</th>
+          <th>Seed</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (experiments.length === 0) { %>
+          <tr>
+            <td colspan="5">No experiments yet.</td>
+          </tr>
+        <% } %>
+        <% experiments.forEach((exp) => { %>
+          <tr>
+            <td><%= exp.id %></td>
+            <td><a href="/experiments/<%= exp.id %>"><%= exp.name %></a></td>
+            <td><span class="badge"><%= exp.design_type %></span></td>
+            <td><%= exp.seed %></td>
+            <td><%= new Date(exp.created_at).toLocaleDateString() %></td>
+            <td>
+              <form action="/experiments/<%= exp.id %>/delete" method="post" onsubmit="return confirm('Delete this experiment?');">
+                <button class="pure-button" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<%- include('partials/foot') %>

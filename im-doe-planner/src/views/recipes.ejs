@@ -1,0 +1,75 @@
+<%- include('partials/head', { title: 'IM-DOE Planner | Recipes' }) %>
+<%- include('partials/nav') %>
+<div class="container">
+  <div class="card">
+    <div class="recipes-header">
+      <div>
+        <h1 class="card-title">Saved Recipes</h1>
+        <p class="small-note">Import BPACKs-style matrix CSV/TSV to populate recipe components.</p>
+      </div>
+      <div class="recipes-actions">
+        <input type="search" class="recipe-search" placeholder="Search recipes..." data-recipe-search>
+        <form class="pure-form" action="/recipes/import" method="post" enctype="multipart/form-data">
+          <input type="file" name="matrix" accept=".csv,.tsv,text/csv,text/tab-separated-values" required>
+          <button class="icon-btn" type="submit" title="Import Recipes">Import</button>
+        </form>
+        <form class="pure-form" action="/recipes/clear" method="post" onsubmit="return confirm('Delete all imported recipes?');">
+          <button class="icon-btn danger" type="submit" title="Delete All Recipes">Delete All</button>
+        </form>
+      </div>
+    </div>
+    <% if (importedCount !== null) { %>
+      <p class="small-note"><%= importedCount %> recipes imported.</p>
+    <% } %>
+    <% if (error) { %>
+      <p class="small-note"><%= error %></p>
+    <% } %>
+    <% if (recipes.length === 0) { %>
+      <p class="small-note">No recipes loaded yet.</p>
+    <% } else { %>
+      <div class="recipe-card-grid">
+        <% recipes.forEach((recipe) => { %>
+          <% const dataText = [recipe.name, recipe.description || '', ...recipe.components.map((c) => `${c.component_name} ${c.phr}`)].join(' ').toLowerCase(); %>
+          <div class="recipe-card" data-recipe-text="<%= dataText %>">
+            <div class="recipe-card-header">
+              <h3><%= recipe.name %></h3>
+              <div>
+                <span class="badge imported">import</span>
+              </div>
+            </div>
+            <% if (recipe.description) { %>
+              <div class="recipe-desc"><%= recipe.description %></div>
+            <% } %>
+            <div class="recipe-components">
+              <% const maxLines = 10; %>
+              <% const comps = recipe.components || []; %>
+              <% comps.slice(0, maxLines).forEach((component) => { %>
+                <div class="recipe-comp-line">
+                  <span class="recipe-comp-name"><%= component.component_name %></span>
+                  <span class="recipe-comp-qty"><%= formatNumber(component.phr) %></span>
+                </div>
+              <% }); %>
+              <% if (comps.length > maxLines) { %>
+                <div class="recipe-comp-more">+<%= comps.length - maxLines %> more</div>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/foot') %>
+
+<script>
+  const searchInput = document.querySelector('[data-recipe-search]');
+  if (searchInput) {
+    searchInput.addEventListener('input', (event) => {
+      const query = event.target.value.toLowerCase();
+      document.querySelectorAll('[data-recipe-text]').forEach((card) => {
+        const text = card.getAttribute('data-recipe-text') || '';
+        card.style.display = text.includes(query) ? '' : 'none';
+      });
+    });
+  }
+</script>

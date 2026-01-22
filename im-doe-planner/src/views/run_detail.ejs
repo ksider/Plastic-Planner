@@ -1,0 +1,100 @@
+<%- include('partials/head', { title: `Run ${run.run_code}` }) %>
+<%- include('partials/nav') %>
+<div class="container">
+  <div class="card">
+    <h1 class="card-title">Run <%= run.run_code %></h1>
+    <p class="small-note">Experiment: <%= experiment.name %></p>
+    <div class="run-controls">
+      <% if (prevId) { %>
+        <a class="pure-button" href="/runs/<%= prevId %>">Prev</a>
+      <% } %>
+      <% if (nextId) { %>
+        <a class="pure-button" href="/runs/<%= nextId %>">Next</a>
+      <% } %>
+      <a class="pure-button" href="/experiments/<%= experiment.id %>?tab=runs">Back to Runs</a>
+    </div>
+  </div>
+
+  <% if (recipe) { %>
+    <div class="card">
+      <h2 class="card-title">Recipe: <%= recipe.name %></h2>
+      <table class="pure-table table-compact">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>PHR</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% components.forEach((component) => { %>
+            <tr>
+              <td><%= component.component_name %></td>
+              <td><%= component.phr %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <form class="pure-form run-form" action="/runs/<%= run.id %>" method="post">
+    <div class="card">
+      <h2 class="card-title">Inputs</h2>
+      <div class="value-list">
+        <% inputParams.forEach((param) => { const value = valueMap.get(param.id); %>
+          <div class="value-row">
+            <div class="value-label"><%= param.label %> <span class="small-note"><%= param.unit || '' %></span></div>
+            <div class="value-dots"></div>
+            <div class="value-value">
+              <% if (param.field_type === 'text') { %>
+                <%= value?.value_text ?? '-' %>
+              <% } else { %>
+                <%= formatNumber(value?.value_real) %>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Outputs</h2>
+      <div class="grid-two">
+        <% outputParams.forEach((param) => { const value = valueMap.get(param.id); %>
+          <div>
+            <label><%= param.label %> <span class="small-note"><%= param.unit || '' %></span></label>
+            <% if (param.field_type === 'tag') { %>
+              <% const tags = param.allowed_values_json ? JSON.parse(param.allowed_values_json) : []; %>
+              <% const selected = value?.value_tags_json ? JSON.parse(value.value_tags_json) : []; %>
+              <div class="tag-cloud">
+                <% tags.forEach((tag) => { %>
+                  <label class="pure-checkbox">
+                    <input type="checkbox" name="param_<%= param.id %>_tags" value="<%= tag %>" <%= selected.includes(tag) ? 'checked' : '' %>>
+                    <span class="tag-chip"><%= tag %></span>
+                  </label>
+                <% }); %>
+              </div>
+            <% } else if (param.field_type === 'text') { %>
+              <input type="text" name="param_<%= param.id %>" value="<%= value?.value_text ?? '' %>">
+            <% } else { %>
+              <input type="number" step="any" name="param_<%= param.id %>" value="<%= value?.value_real ?? '' %>">
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="run-controls">
+        <label class="pure-checkbox">
+          <input type="checkbox" name="done" <%= run.done ? 'checked' : '' %>> Done
+        </label>
+        <label class="pure-checkbox">
+          <input type="checkbox" name="exclude" <%= run.exclude_from_analysis ? 'checked' : '' %>> Exclude from analysis
+        </label>
+        <button class="pure-button pure-button-primary" type="submit">Save Run</button>
+      </div>
+    </div>
+  </form>
+</div>
+<%- include('partials/foot') %>

@@ -1,0 +1,29 @@
+{
+  "name": "im-doe-planner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.1.2",
+    "echarts": "^5.5.0",
+    "echarts-gl": "^2.0.9",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "jstat": "^1.9.6",
+    "multer": "^1.4.5-lts.1",
+    "papaparse": "^5.4.1",
+    "purecss": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^20.11.19",
+    "tsx": "^4.19.1",
+    "typescript": "^5.5.4"
+  }
+}

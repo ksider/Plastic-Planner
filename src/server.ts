@@ -1,6 +1,6 @@
 import { createApp } from "./app.js";
 
-const port = 3000;
+const port = 5731;
 const app = await createApp();
 
 app.listen(port, () => {
