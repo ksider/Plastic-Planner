@@ -1,4 +1,4 @@
-<%- include('partials/head', { title: `IM-DOE Planner | ${experiment.name}` }) %>
+<%- include('partials/head', { title: `IM Planner | ${experiment.name}` }) %>
 <%- include('partials/nav') %>
 <div class="container">
   <div class="card">
@@ -72,6 +72,9 @@
         <button class="pure-button" type="button" data-close>Close</button>
       </div>
       <div class="modal-body">
+        <% if (errorMessage) { %>
+          <p class="small-note"><strong><%= errorMessage %></strong></p>
+        <% } %>
         <form class="pure-form" action="/experiments/<%= experiment.id %>/configs" method="post" id="factorForm">
           <table class="pure-table table-compact">
             <thead>
@@ -193,6 +196,9 @@
       if (openFactorDialog && factorDialog) {
         openFactorDialog.addEventListener('click', () => factorDialog.showModal());
       }
+      if (factorDialog && "<%= errorMessage ? '1' : '' %>") {
+        factorDialog.showModal();
+      }
       document.querySelectorAll('[data-close]').forEach((btn) => {
         btn.addEventListener('click', () => factorDialog.close());
       });
@@ -238,6 +244,7 @@
         <a class="pure-button" href="/experiments/<%= experiment.id %>/export/wide">Export Wide CSV</a>
       </div>
       <% const recipeMap = new Map(); recipes.forEach(r => recipeMap.set(r.id, r.name)); %>
+      <% const activeMap = new Map(); activeInputParams.forEach(p => activeMap.set(p.id, p)); %>
       <table class="pure-table table-compact" style="margin-top: 1rem;">
         <thead>
           <tr>
@@ -245,18 +252,24 @@
             <th>Recipe</th>
             <th>Done</th>
             <th>Exclude</th>
+            <% activeInputParams.forEach((param) => { %>
+              <th><%= param.label %> <span class="small-note"><%= param.unit || '' %></span></th>
+            <% }); %>
           </tr>
         </thead>
         <tbody>
           <% if (runs.length === 0) { %>
-            <tr><td colspan="4">No runs yet. Generate a runlist.</td></tr>
+            <tr><td colspan="<%= 4 + activeInputParams.length %>">No runs yet. Generate a runlist.</td></tr>
           <% } %>
-          <% runs.forEach((run) => { %>
+          <% runRows.forEach((run) => { %>
             <tr class="<%= run.done ? 'run-done' : '' %> <%= run.exclude_from_analysis ? 'run-excluded' : '' %>">
               <td><a href="/runs/<%= run.id %>"><%= run.run_code %></a></td>
               <td><%= run.recipe_id ? recipeMap.get(run.recipe_id) : '-' %></td>
               <td><%= run.done ? 'Yes' : 'No' %></td>
               <td><%= run.exclude_from_analysis ? 'Yes' : 'No' %></td>
+              <% activeInputParams.forEach((param) => { %>
+                <td><%= formatNumber(run.values[param.id]) %></td>
+              <% }); %>
             </tr>
           <% }); %>
         </tbody>

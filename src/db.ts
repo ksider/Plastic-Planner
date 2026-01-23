@@ -158,6 +158,9 @@ async function init(): Promise<Database> {
       run_code TEXT NOT NULL,
       recipe_id INTEGER,
       recipe_variant TEXT,
+      replicate_key TEXT,
+      replicate_index INTEGER NOT NULL DEFAULT 1,
+      exclude_from_analysis INTEGER NOT NULL DEFAULT 0,
       mold_temp_c REAL,
       done INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -180,6 +183,40 @@ async function init(): Promise<Database> {
       moisture_pct REAL,
       density_g_cm3 REAL,
       FOREIGN KEY (run_id) REFERENCES im_runs(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS analysis_fields (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scope_type TEXT NOT NULL,
+      scope_id INTEGER,
+      code TEXT NOT NULL,
+      label TEXT NOT NULL,
+      field_type TEXT NOT NULL DEFAULT 'number',
+      unit TEXT,
+      display_group TEXT,
+      allowed_values_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(scope_type, scope_id, code)
+    );
+
+    CREATE TABLE IF NOT EXISTS analysis_run_values (
+      scope_type TEXT NOT NULL,
+      run_id INTEGER NOT NULL,
+      field_id INTEGER NOT NULL,
+      value_real REAL,
+      value_text TEXT,
+      value_tags_json TEXT,
+      PRIMARY KEY (scope_type, run_id, field_id),
+      FOREIGN KEY (field_id) REFERENCES analysis_fields(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS analysis_configs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scope_type TEXT NOT NULL,
+      scope_id INTEGER,
+      config_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(scope_type, scope_id)
     );
   `);
 
@@ -417,6 +454,19 @@ async function init(): Promise<Database> {
     const imRunColumnNames = new Set(imRunColumns.map((c) => c.name));
     if (!imRunColumnNames.has("recipe_variant")) {
       await db.exec("ALTER TABLE im_runs ADD COLUMN recipe_variant TEXT");
+    }
+    if (!imRunColumnNames.has("replicate_key")) {
+      await db.exec("ALTER TABLE im_runs ADD COLUMN replicate_key TEXT");
+    }
+    if (!imRunColumnNames.has("replicate_index")) {
+      await db.exec(
+        "ALTER TABLE im_runs ADD COLUMN replicate_index INTEGER NOT NULL DEFAULT 1"
+      );
+    }
+    if (!imRunColumnNames.has("exclude_from_analysis")) {
+      await db.exec(
+        "ALTER TABLE im_runs ADD COLUMN exclude_from_analysis INTEGER NOT NULL DEFAULT 0"
+      );
     }
   }
 
@@ -720,6 +770,125 @@ async function init(): Promise<Database> {
              label = ?
          WHERE code = ?`,
         [p[7], p[1], p[0]]
+      );
+    }
+  }
+
+  const analysisFieldDefaults = [
+    ["melt_temp", "Melt temperature", "number", "°C", "Process", null],
+    ["fill_time", "Fill time", "number", "s", "Process", null],
+    ["cycle_time", "Cycle time", "number", "s", "Core", null],
+    ["peak_inj_pressure", "Peak injection pressure", "number", "bar", "Process", null],
+    ["cushion", "Cushion actual", "number", "mm", "Process", null],
+    ["part_weight", "Part weight", "number", "g", "Core", null],
+    ["wall_thickness", "Wall thickness", "number", "mm", "Part", null],
+    ["eject_temp", "Part temp after ejection", "number", "°C", "Part", null],
+    ["shots_per_run", "Shots per run", "number", "", "Shots", null],
+    ["shots_ok", "Good shots", "number", "", "Shots", null],
+    ["shots_scrap", "Scrap shots", "number", "", "Shots", null],
+    [
+      "defect_tags",
+      "Defect tags",
+      "tag",
+      "",
+      "Defects",
+      JSON.stringify([
+        "sticking",
+        "flash",
+        "short_shot",
+        "overheating",
+        "bubbles",
+        "warpage",
+        "sink",
+        "brittle",
+        "poor_surface",
+        "demold_damage",
+      ]),
+    ],
+    ["output_notes", "Output notes", "text", "", "Notes", null],
+  ] as Array<[string, string, string, string, string, string | null]>;
+
+  const analysisFieldCount = (await db.get<{ count: number }>(
+    "SELECT COUNT(*) as count FROM analysis_fields WHERE scope_type = 'im' AND scope_id IS NULL"
+  )) ?? { count: 0 };
+
+  if (analysisFieldCount.count === 0) {
+    for (const field of analysisFieldDefaults) {
+      await db.run(
+        `INSERT INTO analysis_fields
+         (scope_type, scope_id, code, label, field_type, unit, display_group, allowed_values_json)
+         VALUES ('im', NULL, ?, ?, ?, ?, ?, ?)`,
+        field
+      );
+    }
+  } else {
+    for (const field of analysisFieldDefaults) {
+      const existing = await db.get(
+        "SELECT id FROM analysis_fields WHERE scope_type = 'im' AND scope_id IS NULL AND code = ?",
+        [field[0]]
+      );
+      if (existing) continue;
+      await db.run(
+        `INSERT INTO analysis_fields
+         (scope_type, scope_id, code, label, field_type, unit, display_group, allowed_values_json)
+         VALUES ('im', NULL, ?, ?, ?, ?, ?, ?)`,
+        field
+      );
+    }
+    const defectDefault = analysisFieldDefaults.find((f) => f[0] === "defect_tags");
+    if (defectDefault) {
+      await db.run(
+        `UPDATE analysis_fields
+         SET allowed_values_json = ?
+         WHERE scope_type = 'im' AND scope_id IS NULL AND code = 'defect_tags'`,
+        [defectDefault[5]]
+      );
+    }
+  }
+
+  const analysisValueCount = (await db.get<{ count: number }>(
+    "SELECT COUNT(*) as count FROM analysis_run_values WHERE scope_type = 'im'"
+  )) ?? { count: 0 };
+
+  if (analysisValueCount.count === 0) {
+    const fieldRows = await db.all<{
+      id: number;
+      code: string;
+      field_type: string;
+    }>("SELECT id, code, field_type FROM analysis_fields WHERE scope_type = 'im' AND scope_id IS NULL");
+    const fieldByCode = new Map(fieldRows.map((f) => [f.code, f]));
+    const outputRows = await db.all<{
+      run_id: number;
+      code: string;
+      value_real: number | null;
+      value_text: string | null;
+    }>(
+      `SELECT rp.run_id, d.code, rp.value_real, rp.value_text
+       FROM im_run_param_values rp
+       JOIN im_param_definitions d ON d.id = rp.param_def_id
+       WHERE d.is_output = 1`
+    );
+    for (const row of outputRows) {
+      const field = fieldByCode.get(row.code);
+      if (!field) continue;
+      const tags =
+        field.field_type === "tag"
+          ? String(row.value_text || "")
+              .split(",")
+              .map((v) => v.trim())
+              .filter((v) => v)
+          : [];
+      const valueText =
+        field.field_type === "text" && row.value_text ? row.value_text : null;
+      const valueTags =
+        field.field_type === "tag" && tags.length > 0
+          ? JSON.stringify(tags)
+          : null;
+      await db.run(
+        `INSERT OR REPLACE INTO analysis_run_values
+         (scope_type, run_id, field_id, value_real, value_text, value_tags_json)
+         VALUES ('im', ?, ?, ?, ?, ?)`,
+        [row.run_id, field.id, row.value_real, valueText, valueTags]
       );
     }
   }

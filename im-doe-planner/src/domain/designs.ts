@@ -48,12 +48,12 @@ function levelsFromConfig(config: FactorConfig): number[] {
 }
 
 export function buildSimDesign(factors: FactorConfig[], seed: number, maxRuns: number): DesignRun[] {
-  const listFactors = factors.filter((f) => f.mode === "LIST");
-  const sets = listFactors.map((factor) => levelsFromConfig(factor));
+  const usable = factors.filter((factor) => levelsFromConfig(factor).length > 0);
+  const sets = usable.map((factor) => levelsFromConfig(factor));
   const combos = cartesian(sets);
   const runs = combos.slice(0, maxRuns).map((combo) => {
     const values: Record<number, number> = {};
-    listFactors.forEach((factor, idx) => {
+    usable.forEach((factor, idx) => {
       values[factor.paramDefId] = combo[idx];
     });
     return { values };

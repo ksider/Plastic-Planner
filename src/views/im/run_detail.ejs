@@ -67,74 +67,78 @@
               <span class="slider"></span>
             </label>
           </div>
+          <div class="done-toggle">
+            <span>Exclude from analysis</span>
+            <label class="switch">
+              <input type="hidden" name="exclude_from_analysis" value="0" />
+              <input type="checkbox" name="exclude_from_analysis" value="1" <%= run.exclude_from_analysis ? 'checked' : '' %> />
+              <span class="slider"></span>
+            </label>
+          </div>
         </form>
       </div>
 
       <div class="card">
-        <h2>Measured outputs</h2>
+        <div class="card-header">
+          <h2>Measured outputs</h2>
+          <form method="POST" action="/im/<%= experiment.id %>/analysis-fields" class="analysis-field-form">
+            <input type="hidden" name="redirect_to" value="/im/<%= experiment.id %>/runs/<%= run.id %>" />
+            <input name="label" placeholder="Field label" required />
+            <select name="field_type">
+              <option value="number">Number</option>
+              <option value="text">Text</option>
+              <option value="tag">Tag</option>
+            </select>
+            <input name="unit" placeholder="Unit" />
+            <input name="display_group" placeholder="Group" />
+            <input name="allowed_values" placeholder="Tags (comma-separated)" />
+            <label class="check-inline">
+              <input type="checkbox" name="is_global" value="1" />
+              <span>Global</span>
+            </label>
+            <button type="submit">Add field</button>
+          </form>
+        </div>
         <form method="POST" action="/im/<%= experiment.id %>/runs/<%= run.id %>" class="run-form" data-im-run-form data-im-run-url="/im/<%= experiment.id %>/runs/<%= run.id %>">
-          <% const defsByCode = {}; outputs.forEach((d) => { defsByCode[d.code] = d; }); %>
-          <fieldset class="param-fieldset">
-            <legend>Outputs · Core</legend>
-            <div class="run-compact-grid">
-              <% ['cycle_time','part_weight','defect_tags'].forEach((code) => { %>
-                <% const def = defsByCode[code]; if (!def) return; %>
-                <% const isTags = def.code === 'defect_tags'; %>
-                <% const fieldClass = isTags ? 'run-wide' : ''; %>
-                <label class="run-compact-field <%= fieldClass %>">
-                  <span><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></span>
-                  <% if (isTags) { %>
-                    <% const selected = (textMap.get(def.id) || '').split(',').map((v) => v.trim()).filter((v) => v); %>
-                    <div class="tag-cloud">
-                      <% (def.options || []).forEach((opt) => { %>
-                        <label class="tag-pill">
-                          <input type="checkbox" name="param_<%= def.id %>" value="<%= opt %>" <%= selected.includes(opt) ? 'checked' : '' %> />
-                          <span><%= opt %></span>
-                        </label>
-                      <% }) %>
-                    </div>
-                  <% } else { %>
-                    <input class="run-input" type="text" inputmode="decimal" name="param_<%= def.id %>" value="<%= valueMap.get(def.id) ?? '' %>" />
-                  <% } %>
-                </label>
-              <% }) %>
-            </div>
-          </fieldset>
-          <fieldset class="param-fieldset">
-            <legend>Outputs · Part</legend>
-            <div class="run-compact-grid">
-              <% ['wall_thickness','eject_temp'].forEach((code) => { %>
-                <% const def = defsByCode[code]; if (!def) return; %>
-                <label class="run-compact-field">
-                  <span><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></span>
-                  <input class="run-input" type="text" inputmode="decimal" name="param_<%= def.id %>" value="<%= valueMap.get(def.id) ?? '' %>" />
-                </label>
-              <% }) %>
-            </div>
-          </fieldset>
-          <fieldset class="param-fieldset">
-            <legend>Outputs · Shots</legend>
-            <div class="run-compact-grid">
-              <% ['shots_per_run','shots_ok','shots_scrap'].forEach((code) => { %>
-                <% const def = defsByCode[code]; if (!def) return; %>
-                <label class="run-compact-field">
-                  <span><%= def.label %> <%= def.unit ? `(${def.unit})` : '' %></span>
-                  <input class="run-input" type="text" inputmode="decimal" name="param_<%= def.id %>" value="<%= valueMap.get(def.id) ?? '' %>" />
-                </label>
-              <% }) %>
-            </div>
-          </fieldset>
-          <fieldset class="param-fieldset">
-            <legend>Outputs · Notes</legend>
-            <div class="run-compact-grid">
-              <% const notesDef = defsByCode['output_notes']; if (notesDef) { %>
-                <label class="run-compact-field run-wide">
-                  <span><%= notesDef.label %></span>
-                  <textarea name="param_<%= notesDef.id %>" rows="4"><%= textMap.get(notesDef.id) ?? '' %></textarea>
-                </label>
-              <% } %>
-            </div>
-          </fieldset>
+          <% analysisGroups.forEach((group) => { %>
+            <fieldset class="param-fieldset">
+              <legend>Outputs · <%= group.group %></legend>
+              <div class="run-compact-grid">
+                <% group.fields.forEach((field) => { %>
+                  <% const valueRow = analysisValueMap.get(field.id); %>
+                  <% const fieldType = field.field_type || 'number'; %>
+                  <% const fieldClass = fieldType === 'tag' || fieldType === 'text' ? 'run-wide' : ''; %>
+                  <label class="run-compact-field <%= fieldClass %>">
+                    <span><%= field.label %> <%= field.unit ? `(${field.unit})` : '' %></span>
+                    <% if (fieldType === 'tag') { %>
+                      <% let selectedTags = []; %>
+                      <% if (valueRow && valueRow.value_tags_json) { %>
+                        <% try { const parsed = JSON.parse(valueRow.value_tags_json); if (Array.isArray(parsed)) selectedTags = parsed.map(String); } catch {} %>
+                      <% } %>
+                      <% const tagOptions = field.allowedValues || []; %>
+                      <input type="hidden" name="analysis_<%= field.id %>" value="" />
+                      <% if (tagOptions.length > 0) { %>
+                        <div class="tag-cloud">
+                          <% tagOptions.forEach((opt) => { %>
+                            <label class="tag-pill">
+                              <input type="checkbox" name="analysis_<%= field.id %>" value="<%= opt %>" <%= selectedTags.includes(opt) ? 'checked' : '' %> />
+                              <span><%= opt %></span>
+                            </label>
+                          <% }) %>
+                        </div>
+                      <% } else { %>
+                        <input class="run-input" type="text" name="analysis_<%= field.id %>" value="<%= selectedTags.join(', ') %>" placeholder="Tag list" />
+                      <% } %>
+                    <% } else if (fieldType === 'text') { %>
+                      <textarea name="analysis_<%= field.id %>" rows="3"><%= valueRow?.value_text ?? '' %></textarea>
+                    <% } else { %>
+                      <input class="run-input" type="text" inputmode="decimal" name="analysis_<%= field.id %>" value="<%= valueRow?.value_real ?? '' %>" />
+                    <% } %>
+                  </label>
+                <% }) %>
+              </div>
+            </fieldset>
+          <% }) %>
         </form>
       </div>
 
@@ -153,4 +157,3 @@
     </main>
   </body>
 </html>
-

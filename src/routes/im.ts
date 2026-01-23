@@ -18,11 +18,18 @@ import { createImExperiment, generateImRuns } from "../services/im_service.js";
 import { getRecipeVariantCount, recipeSearchText } from "../domain/recipes.js";
 import { getRecipeComponentsByIds } from "../repos/experiments_repo.js";
 import {
+  findAnalysisFieldByCode,
+  insertAnalysisField,
+  listAnalysisFields,
+  listAnalysisRunValuesByRunId,
+  listAnalysisRunValuesByRunIds,
+  upsertAnalysisRunValue,
+} from "../repos/analysis_repo.js";
+import {
   deactivateImParamConfig,
   deleteImExperimentCascade,
   findImParamDefinitionByCode,
   getImExperimentById,
-  getImParamConfigByCode,
   getImParamDefinition,
   getImRunById,
   getImRunMaterialProps,
@@ -32,7 +39,6 @@ import {
   insertImParamDefinitionCustom,
   listImExperimentsSummary,
   listImMachineProfiles,
-  listImOutputDefs,
   listImParamConfigsByExperiment,
   listImActiveInputParamConfigsWithLabels,
   listImParamDefs,
@@ -52,8 +58,10 @@ import {
   upsertImParamConfigActive,
   updateImExperimentMaterialDefaults,
   updateImRunDone,
+  updateImRunExclude,
   updateImRunMoldTemp,
   updateImRunParamText,
+  updateImRunReplicate,
   updateImRunRecipe,
   upsertImRunMaterialProps,
   upsertImRunParamValue,
@@ -677,289 +685,342 @@ export function createImRouter(db: Database) {
     const runs = await listImRunsSummary(db, experimentId);
     const runIds = runs.map((r: any) => r.id);
     const inputDefs = await listImParamDefsActiveInputs(db, experimentId);
-    const outputDefs = await listImOutputDefs(db);
+    const analysisFields = await listAnalysisFields(db, "im", experimentId);
+    const numericOutputs = analysisFields.filter((f) => f.field_type === "number");
+    const outputCode = String(req.query.output || "");
+    const outputField =
+      numericOutputs.find((f) => f.code === outputCode) || numericOutputs[0] || null;
+
     const values = await listImRunParamValues(db, runIds);
-    const valueMap = new Map<string, number | null>();
-    const textMap = new Map<string, string | null>();
+    const inputValueMap = new Map<string, number | null>();
     values.forEach((row: any) => {
-      valueMap.set(`${row.run_id}:${row.param_def_id}`, row.value_real);
-      textMap.set(`${row.run_id}:${row.param_def_id}`, row.value_text);
+      inputValueMap.set(`${row.run_id}:${row.param_def_id}`, row.value_real);
     });
 
-    const defectDef = outputDefs.find((d) => d.code === "defect_tags");
-    const keyOutputCodes = [
-      "cycle_time",
-      "part_weight",
-      "wall_thickness",
-      "eject_temp",
-      "shots_per_run",
-      "shots_ok",
-      "shots_scrap",
-    ];
-    const keyOutputs = outputDefs.filter((d) =>
-      keyOutputCodes.includes(d.code)
+    const analysisValues = await listAnalysisRunValuesByRunIds(
+      db,
+      "im",
+      runIds
     );
+    const analysisValueMap = new Map<string, any>();
+    analysisValues.forEach((row: any) => {
+      analysisValueMap.set(`${row.run_id}:${row.field_id}`, row);
+    });
+
+    const defectField = analysisFields.find((f) => f.code === "defect_tags");
+    const defectOptions = defectField?.allowed_values_json
+      ? (() => {
+          try {
+            const parsed = JSON.parse(defectField.allowed_values_json);
+            return Array.isArray(parsed) ? parsed.map(String) : [];
+          } catch {
+            return [];
+          }
+        })()
+      : [];
 
     const runData = runs.map((run: any) => {
-      const defectRaw =
-        defectDef && textMap.get(`${run.id}:${defectDef.id}`)
-          ? textMap.get(`${run.id}:${defectDef.id}`)
-          : "";
-      const defectTags = String(defectRaw || "")
-        .split(",")
-        .map((v) => v.trim())
-        .filter((v) => v);
-      const outputs: Record<string, number | null> = {};
-      keyOutputs.forEach((def) => {
-        const val = valueMap.get(`${run.id}:${def.id}`);
-        outputs[def.code] = val ?? null;
-      });
       const inputs: Record<string, number | null> = {};
-      inputDefs.forEach((def) => {
-        const val = valueMap.get(`${run.id}:${def.id}`);
+      inputDefs.forEach((def: any) => {
+        const val = inputValueMap.get(`${run.id}:${def.id}`);
         inputs[def.code] = val ?? null;
       });
+      const outputValue =
+        outputField &&
+        analysisValueMap.get(`${run.id}:${outputField.id}`)
+          ? analysisValueMap.get(`${run.id}:${outputField.id}`).value_real
+          : null;
+      let defectTags: string[] = [];
+      if (defectField) {
+        const row = analysisValueMap.get(`${run.id}:${defectField.id}`);
+        if (row && row.value_tags_json) {
+          try {
+            const parsed = JSON.parse(row.value_tags_json);
+            if (Array.isArray(parsed)) defectTags = parsed.map(String);
+          } catch {
+            defectTags = [];
+          }
+        }
+      }
       return {
         id: run.id,
         run_code: run.run_code,
+        recipe_id: run.recipe_id,
         recipe: run.recipe_name || "",
-        defectTags,
-        outputs,
+        exclude_from_analysis: run.exclude_from_analysis ? 1 : 0,
         inputs,
+        outputValue,
+        defectTags,
       };
     });
 
-    const goodRuns = runData.filter((r) => {
-      const ok = r.outputs.shots_ok ?? null;
-      const scrap = r.outputs.shots_scrap ?? null;
-      if (typeof ok !== "number" || typeof scrap !== "number") return false;
-      const total = ok + scrap;
-      if (total <= 0) return false;
-      return ok / total >= 0.9;
-    });
-    const badRuns = runData.filter((r) => !goodRuns.includes(r));
+    const includeExcluded = String(req.query.include_excluded || "") === "1";
+    const recipeFilter = String(req.query.recipe_ids || "")
+      .split(",")
+      .map((v) => Number(v))
+      .filter((v) => Number.isFinite(v));
+    const defectFilter = String(req.query.defect_tags || "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v);
 
-    const scoreMetrics: Array<{ code: string; direction: "min" | "max" }> = [
-      { code: "cycle_time", direction: "min" },
-      { code: "shots_scrap", direction: "min" },
-      { code: "shots_ok", direction: "max" },
-    ];
-    const metricRanges = new Map<string, { min: number; max: number }>();
-    scoreMetrics.forEach((m) => {
-      const vals = goodRuns
-        .map((r) => r.outputs[m.code])
-        .filter((v) => typeof v === "number") as number[];
-      if (vals.length > 0) {
-        metricRanges.set(m.code, {
-          min: Math.min(...vals),
-          max: Math.max(...vals),
-        });
-      }
-    });
-    const scoredRuns = goodRuns
-      .map((r) => {
-        const parts: number[] = [];
-        scoreMetrics.forEach((m) => {
-          const range = metricRanges.get(m.code);
-          const val = r.outputs[m.code];
-          if (!range || val === null || val === undefined) return;
-          const span = range.max - range.min;
-          if (span <= 0) return;
-          const score =
-            m.direction === "min"
-              ? (range.max - val) / span
-              : (val - range.min) / span;
-          parts.push(score);
-        });
-        const score =
-          parts.length > 0
-            ? parts.reduce((a, b) => a + b, 0) / parts.length
-            : null;
-        return { ...r, score };
-      })
-      .filter((r) => r.score !== null) as Array<
-      typeof goodRuns[number] & { score: number }
-    >;
-    const suggestedCount = scoredRuns.length
-      ? Math.max(1, Math.ceil(scoredRuns.length * 0.25))
-      : 0;
-    const suggestedRuns = suggestedCount
-      ? [...scoredRuns]
-          .sort((a, b) => b.score - a.score)
-          .slice(0, suggestedCount)
+    let filteredRuns = runData.filter((r) =>
+      includeExcluded ? true : r.exclude_from_analysis !== 1
+    );
+    if (recipeFilter.length > 0) {
+      filteredRuns = filteredRuns.filter(
+        (r) => r.recipe_id !== null && recipeFilter.includes(r.recipe_id)
+      );
+    }
+    if (defectFilter.length > 0) {
+      filteredRuns = filteredRuns.filter((r) =>
+        r.defectTags.some((tag) => defectFilter.includes(tag))
+      );
+    }
+
+    const factorParam = String(req.query.factors || "").trim();
+    const factorList = factorParam
+      ? factorParam.split(",").map((v) => v.trim()).filter((v) => v)
       : [];
+    const factorDefs = [
+      ...inputDefs.map((d: any) => ({
+        code: d.code,
+        label: d.label,
+        unit: d.unit || "",
+        type: "number" as const,
+      })),
+      {
+        code: "recipe",
+        label: "Recipe",
+        unit: "",
+        type: "category" as const,
+      },
+    ];
 
-    const defByCode = new Map(inputDefs.map((d: any) => [d.code, d]));
-    let window = inputDefs.map((def: any) => {
-      let values = goodRuns
-        .map((r) => r.inputs[def.code])
-        .filter((v) => typeof v === "number") as number[];
-      if (values.length === 0) {
-        if (def.mode === "FIXED" && def.fixed_value !== null) {
-          values = [def.fixed_value];
-        } else if (def.mode === "RANGE" && def.range_min !== null && def.range_max !== null) {
-          values = [def.range_min, def.range_max];
-        } else if (def.mode === "LIST" && def.list_json) {
-          try {
-            const list = JSON.parse(def.list_json);
-            if (Array.isArray(list)) {
-              values = list.map((v: any) => Number(v)).filter((v: number) => Number.isFinite(v));
-            }
-          } catch {
-            values = [];
-          }
+    const defaultFactors = factorList.length
+      ? factorList
+      : inputDefs
+          .map((def: any) => {
+            const values = filteredRuns
+              .map((r) => r.inputs[def.code])
+              .filter((v) => typeof v === "number") as number[];
+            const unique = Array.from(new Set(values.map((v) => Number(v))));
+            return unique.length > 1 ? def.code : null;
+          })
+          .filter((v) => v) as string[];
+
+    const activeFactors = defaultFactors.length ? defaultFactors : factorDefs.map((d) => d.code);
+    const hasRecipeFactor = activeFactors.includes("recipe");
+
+    const buildReplicateKey = (run: any) => {
+      const parts: string[] = [];
+      activeFactors.forEach((code) => {
+        if (code === "recipe") {
+          parts.push(`recipe:${run.recipe_id ?? ""}`);
+          return;
         }
-      }
-      return {
-        code: def.code,
-        label: def.label,
-        unit: def.unit || "",
-        n: values.length,
-        min: values.length ? Math.min(...values) : null,
-        max: values.length ? Math.max(...values) : null,
-      };
-    });
+        parts.push(`${code}:${run.inputs[code] ?? ""}`);
+      });
+      return parts.join("|");
+    };
 
-    const windowSuggested = inputDefs.map((def: any) => {
-      const vals = suggestedRuns
-        .map((r) => r.inputs[def.code])
-        .filter((v) => typeof v === "number") as number[];
-      return {
-        code: def.code,
-        n: vals.length,
-        min: vals.length ? Math.min(...vals) : null,
-        max: vals.length ? Math.max(...vals) : null,
-      };
-    });
-    const windowSuggestedMap = new Map(
-      windowSuggested.map((w) => [w.code, w])
-    );
-
-    const windowCombined = window.map((row: any) => {
-      const suggested = windowSuggestedMap.get(row.code);
-      return {
-        ...row,
-        suggested_min: suggested?.min ?? null,
-        suggested_max: suggested?.max ?? null,
-        suggested_n: suggested?.n ?? 0,
-      };
-    });
-
-    const meltCfg = await getImParamConfigByCode(
-      db,
-      experimentId,
-      "barrel_zone1_temp"
-    );
-    if (meltCfg) {
-      let values = goodRuns
-        .map((r) => r.inputs[meltCfg.code])
-        .filter((v) => typeof v === "number") as number[];
-      if (values.length === 0) {
-        if (meltCfg.mode === "FIXED" && meltCfg.fixed_value !== null) {
-          values = [meltCfg.fixed_value];
-        } else if (
-          meltCfg.mode === "RANGE" &&
-          meltCfg.range_min !== null &&
-          meltCfg.range_max !== null
-        ) {
-          values = [meltCfg.range_min, meltCfg.range_max];
-        } else if (meltCfg.mode === "LIST" && meltCfg.list_json) {
-          try {
-            const list = JSON.parse(meltCfg.list_json);
-            if (Array.isArray(list)) {
-              values = list
-                .map((v: any) => Number(v))
-                .filter((v: number) => Number.isFinite(v));
+    const replicateMap = new Map<string, any>();
+    filteredRuns.forEach((run) => {
+      if (typeof run.outputValue !== "number") return;
+      const key = buildReplicateKey(run);
+      if (!replicateMap.has(key)) {
+        replicateMap.set(key, {
+          replicate_key: key,
+          factors: activeFactors.reduce((acc: any, code: string) => {
+            if (code === "recipe") {
+              acc[code] = run.recipe || "";
+            } else {
+              acc[code] = run.inputs[code] ?? null;
             }
-          } catch {
-            values = [];
-          }
-        }
-      }
-      if (values.length > 0) {
-        windowCombined.splice(
-          windowCombined.findIndex((row: any) => row.code === "barrel_zone1_temp"),
-          1
-        );
-        windowCombined.unshift({
-          code: "barrel_zone1_temp",
-          label: "Melt temp (Zone 1)",
-          unit: meltCfg.unit || "°C",
-          n: values.length,
-          min: values.length ? Math.min(...values) : null,
-          max: values.length ? Math.max(...values) : null,
-          suggested_min: null,
-          suggested_max: null,
-          suggested_n: 0,
+            return acc;
+          }, {}),
+          values: [] as number[],
         });
       }
-    }
-    if (meltCfg) {
-      const suggestedVals = suggestedRuns
-        .map((r) => r.inputs[meltCfg.code])
-        .filter((v) => typeof v === "number") as number[];
-      if (suggestedVals.length > 0) {
-        const row = windowCombined.find((r: any) => r.code === "barrel_zone1_temp");
-        if (row) {
-          row.suggested_min = Math.min(...suggestedVals);
-          row.suggested_max = Math.max(...suggestedVals);
-          row.suggested_n = suggestedVals.length;
+      replicateMap.get(key).values.push(run.outputValue);
+    });
+
+    const replicateRows = Array.from(replicateMap.values()).map((row: any) => ({
+      replicate_key: row.replicate_key,
+      factors: row.factors,
+      n: row.values.length,
+      mean: mean(row.values),
+      sd: sd(row.values),
+      min: row.values.length ? Math.min(...row.values) : null,
+      max: row.values.length ? Math.max(...row.values) : null,
+    }));
+
+    const modelRows = filteredRuns.filter(
+      (r) => typeof r.outputValue === "number"
+    );
+
+    const factorEffects = activeFactors.map((code) => {
+        const groups = new Map<string, number[]>();
+        modelRows.forEach((r) => {
+          if (code === "recipe") {
+            const key = r.recipe || "";
+            if (!key) return;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)?.push(r.outputValue as number);
+            return;
+          }
+          const val = r.inputs[code];
+          if (typeof val !== "number") return;
+          const key = String(val);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)?.push(r.outputValue as number);
+        });
+        const summaries = Array.from(groups.entries()).map(([level, values]) => ({
+          level,
+          mean: mean(values),
+          sd: sd(values),
+          n: values.length,
+        }));
+        if (summaries.length < 2) {
+          return { code, label: code, delta_mean: null, pooled_sd: null, effect: null };
+        }
+        const sorted = [...summaries].sort((a, b) => (a.mean ?? 0) - (b.mean ?? 0));
+        const low = sorted[0];
+        const high = sorted[sorted.length - 1];
+        const pooled =
+          low.sd !== null &&
+          high.sd !== null &&
+          low.n > 1 &&
+          high.n > 1
+            ? Math.sqrt(
+                ((low.n - 1) * low.sd * low.sd + (high.n - 1) * high.sd * high.sd) /
+                  (low.n + high.n - 2)
+              )
+            : null;
+        const delta =
+          low.mean !== null && high.mean !== null ? high.mean - low.mean : null;
+        const effect =
+          pooled && delta !== null && pooled !== 0 ? delta / pooled : null;
+        return {
+          code,
+          label:
+            code === "recipe"
+              ? "Recipe"
+              : inputDefs.find((d: any) => d.code === code)?.label || code,
+          delta_mean: delta,
+          pooled_sd: pooled,
+          effect,
+        };
+      });
+
+    const designRows = modelRows.filter((r) =>
+      activeFactors.every((code) => {
+        if (code === "recipe") return true;
+        return typeof r.inputs[code] === "number";
+      })
+    );
+
+    const categories = hasRecipeFactor
+      ? Array.from(
+          new Set(
+            designRows.map((r) => (r.recipe || "").trim()).filter((v) => v)
+          )
+        )
+      : [];
+    const X: number[][] = [];
+    const y: number[] = [];
+    designRows.forEach((r) => {
+      if (typeof r.outputValue !== "number") return;
+      const row: number[] = [1];
+      activeFactors.forEach((code) => {
+        if (code === "recipe") {
+          categories.slice(1).forEach((cat) => {
+            row.push(r.recipe === cat ? 1 : 0);
+          });
+        } else {
+          row.push(Number(r.inputs[code]));
+        }
+      });
+      X.push(row);
+      y.push(r.outputValue as number);
+    });
+
+    const solveLinearSystem = (a: number[][], b: number[]) => {
+      const n = a.length;
+      const m = a[0].length;
+      const matrix = a.map((row, i) => [...row, b[i]]);
+      for (let i = 0; i < m; i += 1) {
+        let maxRow = i;
+        for (let k = i + 1; k < n; k += 1) {
+          if (Math.abs(matrix[k][i]) > Math.abs(matrix[maxRow][i])) {
+            maxRow = k;
+          }
+        }
+        if (matrix[maxRow][i] === 0) continue;
+        [matrix[i], matrix[maxRow]] = [matrix[maxRow], matrix[i]];
+        const pivot = matrix[i][i];
+        for (let j = i; j <= m; j += 1) {
+          matrix[i][j] /= pivot;
+        }
+        for (let k = 0; k < n; k += 1) {
+          if (k === i) continue;
+          const factor = matrix[k][i];
+          for (let j = i; j <= m; j += 1) {
+            matrix[k][j] -= factor * matrix[i][j];
+          }
         }
       }
+      return matrix.slice(0, m).map((row) => row[m]);
+    };
+
+    let r2Adj: number | null = null;
+    let residualSe: number | null = null;
+    if (X.length >= 2 && X[0].length < X.length) {
+      const Xt = X[0].map((_, i) => X.map((row) => row[i]));
+      const XtXMat = Xt.map((row) =>
+        Xt.map((_, j) => row.reduce((sum, v, idx) => sum + v * Xt[j][idx], 0))
+      );
+      const XtY = Xt.map((row) => row.reduce((sum, v, idx) => sum + v * y[idx], 0));
+      const beta = solveLinearSystem(XtXMat, XtY);
+      const yHat = X.map((row) => row.reduce((sum, v, idx) => sum + v * beta[idx], 0));
+      const yMean = mean(y) ?? 0;
+      const sse = y.reduce((sum, val, idx) => sum + (val - yHat[idx]) ** 2, 0);
+      const sst = y.reduce((sum, val) => sum + (val - yMean) ** 2, 0);
+      const r2 = sst > 0 ? 1 - sse / sst : null;
+      const n = y.length;
+      const p = X[0].length;
+      r2Adj =
+        r2 !== null && n - p > 0 ? 1 - (1 - r2) * ((n - 1) / (n - p)) : null;
+      residualSe = n - p > 0 ? Math.sqrt(sse / (n - p)) : null;
     }
-
-    const outputSummary = keyOutputs.map((def) => {
-      const vals = goodRuns
-        .map((r) => r.outputs[def.code])
-        .filter((v) => typeof v === "number") as number[];
-      return {
-        label: def.label,
-        unit: def.unit || "",
-        n: vals.length,
-        mean: vals.length ? mean(vals) : null,
-        sd: vals.length > 1 ? sd(vals) : null,
-      };
-    });
-
-    const defectCountsGood = new Map<string, number>();
-    const defectCountsBad = new Map<string, number>();
-    runData.forEach((r) => {
-      const target = goodRuns.includes(r) ? defectCountsGood : defectCountsBad;
-      r.defectTags.forEach((tag) => {
-        target.set(tag, (target.get(tag) || 0) + 1);
-      });
-    });
-    const defectListGood = Array.from(defectCountsGood.entries())
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count);
-    const defectListBad = Array.from(defectCountsBad.entries())
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count);
-
-    const missingOutputs = keyOutputs.map((def) => {
-      const missing = runData.filter((r) => r.outputs[def.code] === null)
-        .length;
-      return { label: def.label, missing };
-    });
 
     res.json({
-      quality: {
-        runs: runData.length,
-        goodRuns: goodRuns.length,
-        badRuns: badRuns.length,
-        defectRate:
-          runData.length > 0
-            ? Math.round((badRuns.length / runData.length) * 100)
-            : 0,
-        missingOutputs,
+      selection: {
+        output: outputField ? outputField.code : null,
+        factors: activeFactors,
+        recipe_ids: recipeFilter,
+        defect_tags: defectFilter,
+        include_excluded: includeExcluded ? 1 : 0,
       },
-      window: windowCombined,
-      suggestedNote: suggestedRuns.length
-        ? `Suggested window based on top ${suggestedRuns.length} runs (cycle time ↓, scrap ↓, good shots ↑).`
-        : "Suggested window unavailable (not enough output data).",
-      outputSummary,
-      defectListGood,
-      defectListBad,
+      outputs: numericOutputs.map((f) => ({
+        code: f.code,
+        label: f.label,
+        unit: f.unit || "",
+      })),
+      factors: factorDefs,
+      recipes: runs
+        .filter((r: any) => r.recipe_id)
+        .map((r: any) => ({ id: r.recipe_id, name: r.recipe_name }))
+        .filter((r: any, idx: number, arr: any[]) =>
+          arr.findIndex((x) => x.id === r.id) === idx
+        ),
+      defect_options: defectOptions,
+      aggregates: replicateRows,
+      stats: {
+        delta_mean: factorEffects,
+        r2_adj: r2Adj,
+        residual_se: residualSe,
+      },
     });
   })
 );
@@ -986,7 +1047,6 @@ export function createImRouter(db: Database) {
     );
     const paramValues = await listImRunParamValuesByRun(db, runId);
     const valueMap = new Map(paramValues.map((v: any) => [v.param_def_id, v.value_real]));
-    const textMap = new Map(paramValues.map((v: any) => [v.param_def_id, v.value_text]));
 
     const defWithOptions = paramDefs.map((def) => {
       let options: string[] = [];
@@ -1002,7 +1062,30 @@ export function createImRouter(db: Database) {
     });
 
     const inputDefs = defWithOptions.filter((d) => Number(d.is_output) === 0);
-    const outputDefs = defWithOptions.filter((d) => Number(d.is_output) === 1);
+    const analysisFieldsRaw = await listAnalysisFields(db, "im", experimentId);
+    const analysisFields = analysisFieldsRaw.map((field) => {
+      let allowedValues: string[] = [];
+      if (field.allowed_values_json) {
+        try {
+          const parsed = JSON.parse(field.allowed_values_json);
+          if (Array.isArray(parsed)) allowedValues = parsed.map(String);
+        } catch {
+          allowedValues = [];
+        }
+      }
+      return { ...field, allowedValues };
+    });
+    const analysisValues = await listAnalysisRunValuesByRunId(db, "im", runId);
+    const analysisValueMap = new Map(
+      analysisValues.map((row: any) => [row.field_id, row])
+    );
+    const analysisGroups = new Map<string, typeof analysisFields>();
+    analysisFields.forEach((field) => {
+      const group = field.display_group || "Custom";
+      const existing = analysisGroups.get(group) || [];
+      existing.push(field);
+      analysisGroups.set(group, existing);
+    });
     const settingsList = paramConfigs.map((cfg: any) => {
       const assigned = valueMap.get(cfg.param_def_id);
       let display: string | null = null;
@@ -1037,17 +1120,79 @@ export function createImRouter(db: Database) {
       recipes: await listRecipeNames(db),
       material,
       params: inputDefs,
-      outputs: outputDefs,
+      analysisFields,
+      analysisGroups: Array.from(analysisGroups.entries()).map(([group, fields]) => ({
+        group,
+        fields,
+      })),
+      analysisValueMap,
       settingsList,
       valueMap,
-      textMap,
       stages: groupByStage(inputDefs),
-      outputStages: groupByStage(outputDefs),
       formatNumber,
       slugify,
       prevId: prev?.id ?? null,
       nextId: next?.id ?? null,
     });
+  })
+);
+
+  router.post(
+  "/im/:id/analysis-fields",
+  wrap(async (req, res) => {
+    const experimentId = Number(req.params.id);
+    const label = String(req.body.label || "").trim();
+    const rawType = String(req.body.field_type || "number").trim();
+    const fieldType = ["number", "text", "tag"].includes(rawType) ? rawType : "number";
+    const unit = req.body.unit !== undefined ? String(req.body.unit).trim() : "";
+    const displayGroup =
+      req.body.display_group !== undefined && String(req.body.display_group).trim()
+        ? String(req.body.display_group).trim()
+        : "Custom";
+    const allowedRaw =
+      req.body.allowed_values !== undefined
+        ? String(req.body.allowed_values || "")
+        : "";
+    const allowedValues = allowedRaw
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v);
+    const allowedValuesJson =
+      fieldType === "tag" && allowedValues.length > 0
+        ? JSON.stringify(allowedValues)
+        : null;
+    const isGlobal =
+      req.body.is_global === "1" ||
+      req.body.is_global === "on" ||
+      req.body.is_global === true;
+    const scopeId = isGlobal ? null : experimentId;
+
+    if (!label) {
+      return res.redirect(`/im/${experimentId}`);
+    }
+
+    const baseCode = slugify(label) || "output_field";
+    let code = baseCode;
+    let i = 2;
+    while (await findAnalysisFieldByCode(db, "im", scopeId, code)) {
+      code = `${baseCode}_${i}`;
+      i += 1;
+    }
+    await insertAnalysisField(
+      db,
+      "im",
+      scopeId,
+      code,
+      label,
+      fieldType,
+      unit || null,
+      displayGroup,
+      allowedValuesJson
+    );
+
+    const redirectTo =
+      req.body.redirect_to !== undefined ? String(req.body.redirect_to) : null;
+    res.redirect(redirectTo || `/im/${experimentId}`);
   })
 );
 
@@ -1077,13 +1222,22 @@ export function createImRouter(db: Database) {
     const isJson = req.is("application/json");
 
     const updates: Record<string, unknown> = isJson ? req.body : req.body;
+    const recipeIdProvided = updates.recipe_id !== undefined;
     const recipeId =
-      updates.recipe_id !== undefined && String(updates.recipe_id).trim() !== ""
+      recipeIdProvided && String(updates.recipe_id).trim() !== ""
         ? Number(updates.recipe_id)
         : null;
     const doneValue =
       updates.done !== undefined
         ? updates.done === "1" || updates.done === "on" || updates.done === true
+          ? 1
+          : 0
+        : null;
+    const excludeValue =
+      updates.exclude_from_analysis !== undefined
+        ? updates.exclude_from_analysis === "1" ||
+          updates.exclude_from_analysis === "on" ||
+          updates.exclude_from_analysis === true
           ? 1
           : 0
         : null;
@@ -1097,17 +1251,21 @@ export function createImRouter(db: Database) {
       if (doneValue !== null) {
         await updateImRunDone(db, experimentId, runId, doneValue);
       }
+      if (excludeValue !== null) {
+        await updateImRunExclude(db, experimentId, runId, excludeValue);
+      }
 
       if (updates.moisture_pct !== undefined || updates.density_g_cm3 !== undefined) {
         await upsertImRunMaterialProps(db, runId, moisture, density);
       }
 
-      const paramDefs = await listImParamDefs(db);
-      const moldTempDef = paramDefs.find((d) => d.code === "mold_temp");
-      const moistureDef = paramDefs.find((d) => d.code === "material_moisture_pct");
-      const densityDef = paramDefs.find((d) => d.code === "material_density_g_cm3");
+      const paramDefs = await listImParamDefsAll(db);
+      const inputDefs = paramDefs.filter((d) => Number(d.is_output) === 0);
+      const moldTempDef = inputDefs.find((d) => d.code === "mold_temp");
+      const moistureDef = inputDefs.find((d) => d.code === "material_moisture_pct");
+      const densityDef = inputDefs.find((d) => d.code === "material_density_g_cm3");
       let moldTempValue: number | null = null;
-      for (const def of paramDefs) {
+      for (const def of inputDefs) {
         const key = `param_${def.id}`;
         if (!Object.prototype.hasOwnProperty.call(updates, key)) continue;
         const rawValue = (updates as any)[key];
@@ -1128,6 +1286,41 @@ export function createImRouter(db: Database) {
         await updateImRunParamText(db, runId, def.id, textValue);
       }
 
+      const analysisFields = await listAnalysisFields(db, "im", experimentId);
+      for (const field of analysisFields) {
+        const key = `analysis_${field.id}`;
+        if (!Object.prototype.hasOwnProperty.call(updates, key)) continue;
+        const rawValue = (updates as any)[key];
+        let valueReal: number | null = null;
+        let valueText: string | null = null;
+        let valueTagsJson: string | null = null;
+        if (field.field_type === "text") {
+          valueText =
+            rawValue !== undefined && String(rawValue).trim() !== ""
+              ? String(rawValue).trim()
+              : null;
+        } else if (field.field_type === "tag") {
+          const tags = Array.isArray(rawValue)
+            ? rawValue.map((v) => String(v).trim()).filter((v) => v)
+            : String(rawValue || "")
+                .split(",")
+                .map((v) => v.trim())
+                .filter((v) => v);
+          valueTagsJson = tags.length ? JSON.stringify(tags) : null;
+        } else {
+          valueReal = parseNumberFlexible(rawValue);
+        }
+        await upsertAnalysisRunValue(
+          db,
+          "im",
+          runId,
+          field.id,
+          valueReal,
+          valueText,
+          valueTagsJson
+        );
+      }
+
       if (moistureDef && updates.moisture_pct !== undefined) {
         await upsertImRunParamValue(db, runId, moistureDef.id, moisture);
       }
@@ -1138,6 +1331,35 @@ export function createImRouter(db: Database) {
       if (moldTempValue !== null) {
         await updateImRunMoldTemp(db, experimentId, runId, moldTempValue);
       }
+
+      const activeInputs = await listImParamDefsActiveInputs(db, experimentId);
+      const currentRun = await getImRunById(db, experimentId, runId);
+      const effectiveRecipeId = recipeIdProvided
+        ? recipeId
+        : currentRun?.recipe_id ?? null;
+      const runParams = await listImRunParamValuesByRun(db, runId);
+      const runParamMap = new Map(
+        runParams.map((row: any) => [row.param_def_id, row.value_real])
+      );
+      const replicateParts: string[] = [];
+      activeInputs.forEach((def: any) => {
+        const val = runParamMap.get(def.id);
+        if (val === null || val === undefined) return;
+        replicateParts.push(`${def.code}:${val}`);
+      });
+      if (effectiveRecipeId !== null) {
+        replicateParts.push(`recipe:${effectiveRecipeId}`);
+      }
+      const replicateKey = replicateParts.length ? replicateParts.join("|") : null;
+      const siblings = await db.all<{ id: number }>(
+        "SELECT id FROM im_runs WHERE experiment_id = ? AND replicate_key = ? ORDER BY run_order",
+        [experimentId, replicateKey]
+      );
+      const replicateIndex =
+        siblings.findIndex((r) => r.id === runId) >= 0
+          ? siblings.findIndex((r) => r.id === runId) + 1
+          : 1;
+      await updateImRunReplicate(db, experimentId, runId, replicateKey, replicateIndex);
     });
 
     if (redirectTo) return res.redirect(redirectTo);

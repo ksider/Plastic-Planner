@@ -304,12 +304,25 @@ export async function insertImRun(
   runCode: string,
   recipeId: number | null,
   moldTemp: number | null,
-  recipeVariant: string | null
+  recipeVariant: string | null,
+  replicateKey: string | null,
+  replicateIndex: number
 ) {
   return db.run(
-    `INSERT INTO im_runs (experiment_id, run_order, run_code, recipe_id, mold_temp_c, recipe_variant, done)
-     VALUES (?, ?, ?, ?, ?, ?, 0)`,
-    [experimentId, runOrder, runCode, recipeId, moldTemp, recipeVariant]
+    `INSERT INTO im_runs
+      (experiment_id, run_order, run_code, recipe_id, mold_temp_c, recipe_variant,
+       replicate_key, replicate_index, exclude_from_analysis, done)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+    [
+      experimentId,
+      runOrder,
+      runCode,
+      recipeId,
+      moldTemp,
+      recipeVariant,
+      replicateKey,
+      replicateIndex,
+    ]
   );
 }
 
@@ -341,7 +354,8 @@ export async function insertImRunMaterialProps(
 
 export async function listImRunsSummary(db: Database, experimentId: number) {
   return db.all(
-    `SELECT r.id, r.run_code, r.run_order, r.recipe_id, rec.name as recipe_name
+    `SELECT r.id, r.run_code, r.run_order, r.recipe_id, r.replicate_key,
+            r.replicate_index, r.exclude_from_analysis, rec.name as recipe_name
      FROM im_runs r
      LEFT JOIN recipes rec ON rec.id = r.recipe_id
      WHERE r.experiment_id = ?
@@ -488,6 +502,31 @@ export async function updateImRunDone(db: Database, experimentId: number, runId:
     runId,
     experimentId,
   ]);
+}
+
+export async function updateImRunExclude(
+  db: Database,
+  experimentId: number,
+  runId: number,
+  excludeValue: number
+) {
+  await db.run(
+    "UPDATE im_runs SET exclude_from_analysis = ? WHERE id = ? AND experiment_id = ?",
+    [excludeValue, runId, experimentId]
+  );
+}
+
+export async function updateImRunReplicate(
+  db: Database,
+  experimentId: number,
+  runId: number,
+  replicateKey: string | null,
+  replicateIndex: number
+) {
+  await db.run(
+    "UPDATE im_runs SET replicate_key = ?, replicate_index = ? WHERE id = ? AND experiment_id = ?",
+    [replicateKey, replicateIndex, runId, experimentId]
+  );
 }
 
 export async function upsertImRunMaterialProps(

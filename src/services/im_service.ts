@@ -256,6 +256,21 @@ export async function generateImRuns(
   }
 
   const randomized = randomize(combos, experiment.seed);
+  const replicateCounts = new Map<string, number>();
+
+  const buildReplicateKey = (
+    combo: Record<string, number>,
+    recipeId: number | null
+  ) => {
+    const parts: string[] = [];
+    paramLevels.forEach((p: any) => {
+      const val = (combo as any)[p.param_def_id];
+      if (val === null || val === undefined) return;
+      parts.push(`${p.code}:${val}`);
+    });
+    if (recipeId !== null) parts.push(`recipe:${recipeId}`);
+    return parts.length ? parts.join("|") : "";
+  };
 
   await withTransaction(db, async () => {
     await clearImRuns(db, experimentId);
@@ -275,6 +290,9 @@ export async function generateImRuns(
         (recipeVariants.length > 0 ? recipeVariants[i % recipeVariants.length].id : null);
       const recipeVariant =
         (randomized[i] as any).__recipe_variant ?? null;
+      const replicateKey = buildReplicateKey(randomized[i] as any, recipeId);
+      const replicateIndex = (replicateCounts.get(replicateKey) || 0) + 1;
+      replicateCounts.set(replicateKey, replicateIndex);
       let moldTemp: number | null = null;
       for (const p of paramLevels) {
         if (p.code === "mold_temp") {
@@ -295,7 +313,9 @@ export async function generateImRuns(
         runCode,
         recipeId,
         moldTemp,
-        recipeVariant
+        recipeVariant,
+        replicateKey || null,
+        replicateIndex
       );
       const runId = result.lastID as number;
 

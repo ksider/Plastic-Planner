@@ -545,6 +545,124 @@ table tbody tr:hover {
   font-size: 24px;
 }
 
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.analysis-field-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.analysis-field-form input,
+.analysis-field-form select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #d8d2c5;
+  background: #fff;
+  font-size: 12px;
+}
+
+.analysis-field-form button {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.analysis-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.analysis-control label {
+  display: block;
+  font-size: 12px;
+  color: #6b6b63;
+  margin-bottom: 6px;
+}
+
+.analysis-control select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #d8d2c5;
+  background: #fff;
+  font-size: 13px;
+}
+
+.analysis-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.analysis-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d8d2c5;
+  background: #fff;
+  font-size: 12px;
+}
+
+.analysis-chip input {
+  margin: 0;
+}
+
+.analysis-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b6b63;
+}
+
+.analysis-stats {
+  margin-top: 16px;
+}
+
+.analysis-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.analysis-stat-grid label {
+  display: block;
+  font-size: 12px;
+  color: #6b6b63;
+}
+
+.analysis-table {
+  margin-top: 16px;
+}
+
+.analysis-table .table-wrap table th,
+.analysis-table .table-wrap table td {
+  font-size: 12px;
+}
+
+.analysis-chart {
+  margin-top: 16px;
+}
+
 .recipe-select-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

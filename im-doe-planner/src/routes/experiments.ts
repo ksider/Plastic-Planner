@@ -70,6 +70,7 @@ export function createExperimentsRouter(db: Db) {
     const outputParams = listParamDefinitionsByKind(db, experimentId, "OUTPUT");
     const configs = listParamConfigs(db, experimentId);
     const runs = listRuns(db, experimentId);
+    const runRows = loadRuns(db, experimentId);
     const activeInputParams = inputParams.filter((param) => {
       const cfg = configs.find((c) => c.param_def_id === param.id);
       return cfg?.active === 1;
@@ -151,6 +152,7 @@ export function createExperimentsRouter(db: Db) {
       outputNumericParams,
       configs,
       runs,
+      runRows,
       tab,
       analysis,
       runPreview,
@@ -188,6 +190,8 @@ export function createExperimentsRouter(db: Db) {
     const experiment = getExperiment(db, experimentId);
     if (!experiment) return res.status(404).send("Experiment not found");
     const configs = listParamConfigs(db, experimentId);
+    const inputParams = listParamDefinitionsByKind(db, experimentId, "INPUT");
+    const labelMap = new Map(inputParams.map((param) => [param.id, param.label]));
     const updates: Array<{
       experiment_id: number;
       param_def_id: number;
@@ -205,8 +209,8 @@ export function createExperimentsRouter(db: Db) {
       const prefix = `param_${config.param_def_id}`;
       const active = req.body[`${prefix}_active`] ? 1 : 0;
       const mode = req.body[`${prefix}_mode`] || config.mode;
-      const rangeMin = parseNumber(req.body[`${prefix}_min`]);
-      const rangeMax = parseNumber(req.body[`${prefix}_max`]);
+      let rangeMin = parseNumber(req.body[`${prefix}_min`]);
+      let rangeMax = parseNumber(req.body[`${prefix}_max`]);
       const valuesRaw = String(req.body[`${prefix}_values`] || "");
       const values = valuesRaw
         .split(/[\s,;]+/)
@@ -216,17 +220,32 @@ export function createExperimentsRouter(db: Db) {
       const fixed = mode === "FIXED" ? values[0] : NaN;
       const list = mode === "LIST" ? values : [];
 
+      if (
+        mode === "RANGE" &&
+        (!Number.isFinite(rangeMin) || !Number.isFinite(rangeMax)) &&
+        values.length >= 2
+      ) {
+        rangeMin = values[0];
+        rangeMax = values[1];
+      }
+
       if (experiment.design_type === "BBD" && active === 1) {
         if (mode === "FIXED") {
-          errors.push("BBD requires active factors to have 3 levels (no FIXED).");
+          errors.push(
+            `BBD: "${labelMap.get(config.param_def_id) || "Factor"}" must be RANGE or LIST (3 levels).`
+          );
         }
         if (mode === "RANGE") {
           if (!Number.isFinite(rangeMin) || !Number.isFinite(rangeMax)) {
-            errors.push("BBD requires RANGE factors to have min and max.");
+            errors.push(
+              `BBD: "${labelMap.get(config.param_def_id) || "Factor"}" needs min and max.`
+            );
           }
         }
         if (mode === "LIST" && list.length !== 3) {
-          errors.push("BBD requires LIST factors to have exactly 3 values.");
+          errors.push(
+            `BBD: "${labelMap.get(config.param_def_id) || "Factor"}" needs exactly 3 values.`
+          );
         }
       }
 
@@ -322,7 +341,10 @@ export function createExperimentsRouter(db: Db) {
 
 function parseNumber(value: string | number | undefined) {
   if (value == null) return NaN;
-  return parseFloat(String(value));
+  const raw = String(value).trim();
+  if (!raw) return NaN;
+  const normalized = raw.includes(",") && !raw.includes(".") ? raw.replace(",", ".") : raw;
+  return parseFloat(normalized);
 }
 
 function buildRunPreview(
@@ -379,16 +401,20 @@ function buildRunPreview(
   let warning = "";
   let k = 0;
   if (experiment.design_type === "SIM") {
-    const simLevels = activeConfigs
-      .filter((config) => config.mode === "LIST")
-      .map((config) => {
+    const simLevels = activeConfigs.map((config) => {
+      if (config.mode === "LIST") {
         const list = config.list_json ? (JSON.parse(config.list_json) as number[]) : [];
         return list.length;
-      });
+      }
+      if (config.mode === "RANGE") {
+        return config.level_count === 3 ? 3 : 2;
+      }
+      return 1;
+    });
     baseRuns = simLevels.length
       ? simLevels.reduce((acc, val) => acc * Math.max(val, 1), 1)
       : 0;
-    formula = `SIM: product(list lengths) = ${baseRuns}`;
+    formula = `SIM: product(levels) = ${baseRuns}`;
   } else if (experiment.design_type === "FFA") {
     baseRuns = levelCounts.length
       ? levelCounts.reduce((acc, val) => acc * Math.max(val, 1), 1)

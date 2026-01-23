@@ -175,7 +175,10 @@ function setupRunAutosave() {
       }
       const name = target.name;
       if (!name) return;
-      if (target.type === "checkbox" && name.startsWith("param_")) {
+      if (
+        target.type === "checkbox" &&
+        (name.startsWith("param_") || name.startsWith("analysis_"))
+      ) {
         const values = Array.from(
           form.querySelectorAll(`input[name="${name}"]:checked`)
         ).map((el) => el.value);
