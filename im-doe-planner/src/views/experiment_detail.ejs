@@ -24,19 +24,22 @@
         <thead>
           <tr>
             <th>Parameter</th>
-            <th>Group</th>
             <th>Mode</th>
             <th>Values</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody data-factor-summary-body>
           <% if (activeParams.length === 0) { %>
-            <tr><td colspan="4">No active factors selected.</td></tr>
+            <tr><td colspan="3">No active factors selected.</td></tr>
           <% } %>
           <% activeParams.forEach((param) => { const config = configMap.get(param.id); const groupKey = (param.group_label || 'General').toLowerCase().replace(/[^a-z0-9]+/g, '-'); const valuesText = config?.mode === 'RANGE' ? `${formatNumber(config?.range_min_real)} .. ${formatNumber(config?.range_max_real)}` : config?.mode === 'LIST' ? (config?.list_json ? JSON.parse(config.list_json).map((val) => formatNumber(val)).join(', ') : '-') : formatNumber(config?.fixed_value_real); %>
-            <tr class="row-active">
-              <td><%= param.label %></td>
-              <td class="group-cell group-<%= groupKey %>"><%= param.group_label || 'General' %></td>
+            <tr class="row-active group-row group-<%= groupKey %>" data-group-key="<%= groupKey %>">
+              <td>
+                <%= param.label %>
+                <% if (param.unit) { %>
+                  <span class="small-note">(<%= param.unit %>)</span>
+                <% } %>
+              </td>
               <td><span class="badge"><%= config?.mode || 'FIXED' %></span></td>
               <td><%= valuesText %></td>
             </tr>
@@ -51,16 +54,16 @@
     <div class="card">
       <h2 class="card-title">Generate Runs</h2>
       <p class="small-note">Generation will replace existing runs for this experiment.</p>
-      <p class="small-note">
-        Preview: <strong><%= runPreview.totalRuns %></strong> runs
-        = base <%= runPreview.baseRuns %>
-        × recipes <%= runPreview.recipeMultiplier %>
-        × replicates <%= runPreview.replicateMultiplier %>
+      <p class="small-note" data-run-preview>
+        Preview: <strong data-run-total><%= runPreview.totalRuns %></strong> runs
+        = base <span data-run-base><%= runPreview.baseRuns %></span>
+        × recipes <span data-run-recipes><%= runPreview.recipeMultiplier %></span>
+        × replicates <span data-run-replicates><%= runPreview.replicateMultiplier %></span>
       </p>
-      <p class="small-note"><%= runPreview.formula %></p>
-      <% if (runPreview.warning) { %>
-        <p class="small-note"><strong><%= runPreview.warning %></strong></p>
-      <% } %>
+      <p class="small-note" data-run-formula><%= runPreview.formula %></p>
+      <p class="small-note" data-run-warning style="<%= runPreview.warning ? '' : 'display:none;' %>">
+        <strong><%= runPreview.warning %></strong>
+      </p>
       <form class="pure-form" action="/experiments/<%= experiment.id %>/generate" method="post">
         <button class="pure-button pure-button-primary" type="submit">Generate Runlist</button>
       </form>
@@ -75,31 +78,83 @@
         <% if (errorMessage) { %>
           <p class="small-note"><strong><%= errorMessage %></strong></p>
         <% } %>
+        <% const groupSet = new Set(); inputParams.forEach((param) => groupSet.add(param.group_label || 'General')); const groupList = Array.from(groupSet); %>
+        <div class="group-filter" data-group-filter>
+          <button type="button" class="group-chip active" data-group-filter="all">All</button>
+          <% groupList.forEach((group) => { const groupKey = group.toLowerCase().replace(/[^a-z0-9]+/g, '-'); %>
+            <button
+              type="button"
+              class="group-chip"
+              data-group-filter="<%= groupKey %>"
+              data-group-label="<%= group %>"
+            >
+              <%= group %>
+            </button>
+          <% }); %>
+        </div>
         <form class="pure-form" action="/experiments/<%= experiment.id %>/configs" method="post" id="factorForm">
+          <div class="small-note" style="margin-bottom: 0.5rem;">
+            Do not randomize (optional): pick one factor to keep grouped in run order.
+          </div>
           <table class="pure-table table-compact">
             <thead>
               <tr>
-                <th>Active</th>
-                <th>Group</th>
+                <th>On</th>
+                <th>
+                  <label class="toggle">
+                    <input
+                      type="radio"
+                      name="non_randomized_param_id"
+                      value=""
+                      id="nonRandomizeNone"
+                      <%= !nonRandomizedParamId ? 'checked' : '' %>
+                    >
+                    <span class="track"></span>
+                    <span class="toggle-label">None</span>
+                  </label>
+                </th>
                 <th>Parameter</th>
                 <th>Mode</th>
-                <th>Min</th>
-                <th>Max</th>
-                <th>Values (Fixed/List)</th>
-                <% if (experiment.design_type !== 'BBD') { %>
-                  <th>Levels</th>
-                <% } %>
+                <th>Settings</th>
               </tr>
             </thead>
             <tbody>
               <% inputParams.forEach((param) => { const config = configMap.get(param.id); const groupKey = (param.group_label || 'General').toLowerCase().replace(/[^a-z0-9]+/g, '-'); %>
                 <% const valueText = config?.mode === 'LIST' && config?.list_json ? JSON.parse(config.list_json).join(', ') : (config?.fixed_value_real ?? ''); %>
-                <tr data-param-row class="<%= config?.active ? 'row-active' : '' %>">
+                <tr
+                  data-param-row
+                  data-param-id="<%= param.id %>"
+                  data-param-label="<%= param.label %>"
+                  data-param-group="<%= param.group_label || 'General' %>"
+                  data-param-unit="<%= param.unit || '' %>"
+                  data-group-key="<%= groupKey %>"
+                  class="<%= config?.active ? 'row-active' : '' %> group-row group-<%= groupKey %>"
+                >
                   <td>
-                    <input type="checkbox" name="param_<%= param.id %>_active" data-active-toggle <%= config?.active ? 'checked' : '' %>>
+                    <label class="toggle">
+                      <input type="checkbox" name="param_<%= param.id %>_active" data-active-toggle <%= config?.active ? 'checked' : '' %>>
+                      <span class="track"></span>
+                    </label>
                   </td>
-                  <td class="group-cell group-<%= groupKey %>"><%= param.group_label || 'General' %></td>
-                  <td><%= param.label %> <span class="small-note">(<%= param.code %>)</span></td>
+                  <td>
+                    <label class="toggle">
+                      <input
+                        type="radio"
+                        name="non_randomized_param_id"
+                        value="<%= param.id %>"
+                        data-nonrandomize
+                        <%= nonRandomizedParamId === param.id ? 'checked' : '' %>
+                        <%= config?.active ? '' : 'disabled' %>
+                      >
+                      <span class="track"></span>
+                    </label>
+                  </td>
+                  <td>
+                    <%= param.label %>
+                    <% if (param.unit) { %>
+                      <span class="small-note">(<%= param.unit %>)</span>
+                    <% } %>
+                  </td>
                   <td class="mode-cell mode-<%= (config?.mode || 'FIXED').toLowerCase() %>">
                     <select name="param_<%= param.id %>_mode" data-mode-select>
                       <option value="FIXED" <%= config?.mode === 'FIXED' ? 'selected' : '' %>>FIXED</option>
@@ -107,17 +162,23 @@
                       <option value="LIST" <%= config?.mode === 'LIST' ? 'selected' : '' %>>LIST</option>
                     </select>
                   </td>
-                  <td><input type="number" step="any" name="param_<%= param.id %>_min" data-range value="<%= config?.range_min_real ?? '' %>"></td>
-                  <td><input type="number" step="any" name="param_<%= param.id %>_max" data-range value="<%= config?.range_max_real ?? '' %>"></td>
-                  <td><input type="text" name="param_<%= param.id %>_values" data-values value="<%= valueText %>"></td>
-                  <% if (experiment.design_type !== 'BBD') { %>
-                    <td>
-                      <select name="param_<%= param.id %>_levels" data-levels>
-                        <option value="2" <%= (config?.level_count || 2) === 2 ? 'selected' : '' %>>2</option>
-                        <option value="3" <%= config?.level_count === 3 ? 'selected' : '' %>>3</option>
-                      </select>
-                    </td>
-                  <% } %>
+                  <td>
+                    <div class="factor-settings">
+                      <div class="settings-range">
+                        <input type="number" step="any" name="param_<%= param.id %>_min" data-range value="<%= config?.range_min_real ?? '' %>">
+                        <input type="number" step="any" name="param_<%= param.id %>_max" data-range value="<%= config?.range_max_real ?? '' %>">
+                        <% if (experiment.design_type !== 'BBD') { %>
+                          <select name="param_<%= param.id %>_levels" data-levels>
+                            <option value="2" <%= (config?.level_count || 2) === 2 ? 'selected' : '' %>>2</option>
+                            <option value="3" <%= config?.level_count === 3 ? 'selected' : '' %>>3</option>
+                          </select>
+                        <% } %>
+                      </div>
+                      <div class="settings-values">
+                        <input type="text" name="param_<%= param.id %>_values" data-values value="<%= valueText %>">
+                      </div>
+                    </div>
+                  </td>
                 </tr>
               <% }); %>
             </tbody>
@@ -171,19 +232,7 @@
           </form>
         </div>
 
-        <div class="card" style="margin-top: 1rem;">
-          <h2 class="card-title">Defect Tags</h2>
-          <p class="small-note">Update allowed tags for tag fields (including defects).</p>
-          <% const tagFields = outputParams.filter((param) => param.field_type === 'tag'); %>
-          <% tagFields.forEach((param) => { %>
-            <form class="pure-form" action="/experiments/<%= experiment.id %>/tags" method="post" style="margin-bottom: 1rem;">
-              <input type="hidden" name="param_id" value="<%= param.id %>">
-              <label><%= param.label %></label>
-              <input type="text" name="allowed_values" value="<%= param.allowed_values_json ? JSON.parse(param.allowed_values_json).join(', ') : '' %>">
-              <button class="pure-button" type="submit">Update Tags</button>
-            </form>
-          <% }); %>
-        </div>
+        
       </div>
       <div class="modal-footer">
         <button class="pure-button" type="button" data-close>Close</button>
@@ -209,6 +258,8 @@
         const valuesInput = row.querySelector('[data-values]');
         const levelsSelect = row.querySelector('[data-levels]');
         const modeCell = row.querySelector('.mode-cell');
+        const nonRandomize = row.querySelector('[data-nonrandomize]');
+        const activeToggle = row.querySelector('[data-active-toggle]');
         if (!modeSelect) return;
         const mode = modeSelect.value;
         rangeInputs.forEach((input) => { input.disabled = mode !== 'RANGE'; });
@@ -217,6 +268,14 @@
         if (modeCell) {
           modeCell.classList.remove('mode-fixed', 'mode-range', 'mode-list');
           modeCell.classList.add(`mode-${mode.toLowerCase()}`);
+        }
+        row.dataset.mode = mode.toLowerCase();
+        if (nonRandomize && activeToggle) {
+          nonRandomize.disabled = !activeToggle.checked;
+          if (!activeToggle.checked && nonRandomize.checked) {
+            const noneRadio = document.getElementById('nonRandomizeNone');
+            if (noneRadio) noneRadio.checked = true;
+          }
         }
       }
 
@@ -230,9 +289,269 @@
         if (activeToggle) {
           activeToggle.addEventListener('change', () => {
             row.classList.toggle('row-active', activeToggle.checked);
+            updateRow(row);
           });
         }
       });
+
+      const factorForm = document.getElementById('factorForm');
+      if (factorForm) {
+        let saveTimer = null;
+        let saving = false;
+        const scheduleSave = (immediate = false) => {
+          if (saveTimer) clearTimeout(saveTimer);
+          const delay = immediate ? 0 : 350;
+          saveTimer = setTimeout(async () => {
+            if (saving) return;
+            saving = true;
+            const formData = new FormData(factorForm);
+            const body = new URLSearchParams();
+            for (const [key, value] of formData.entries()) {
+              body.append(key, String(value));
+            }
+            try {
+              const resp = await fetch(factorForm.action, {
+                method: 'POST',
+                body,
+                headers: {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'Content-Type': 'application/x-www-form-urlencoded'
+                }
+              });
+              if (!resp.ok) {
+                const data = await resp.json().catch(() => null);
+                if (data?.error) {
+                  console.error('Auto-save failed:', data.error);
+                }
+              }
+            } catch (err) {
+              console.error('Auto-save failed', err);
+            } finally {
+              saving = false;
+            }
+          }, delay);
+        };
+        factorForm.addEventListener('change', scheduleSave);
+        factorForm.addEventListener('blur', scheduleSave, true);
+        factorForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          scheduleSave(true);
+        });
+      }
+
+      function formatValue(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return '';
+        const rounded = Math.round(num * 1000) / 1000;
+        let str = String(rounded);
+        if (str.includes('.')) {
+          str = str.replace(/0+$/, '').replace(/\.$/, '');
+        }
+        return str;
+      }
+
+      function updateFactorSummary() {
+        const tbody = document.querySelector('[data-factor-summary-body]');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        const rows = document.querySelectorAll('[data-param-row]');
+        const activeRows = [];
+        rows.forEach((row) => {
+          const activeToggle = row.querySelector('[data-active-toggle]');
+          if (activeToggle && activeToggle.checked) {
+            activeRows.push(row);
+          }
+        });
+        if (!activeRows.length) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td colspan="3">No active factors selected.</td>';
+          tbody.appendChild(tr);
+          return;
+        }
+        activeRows.forEach((row) => {
+          const modeSelect = row.querySelector('[data-mode-select]');
+          const minInput = row.querySelector('input[data-range][name$="_min"]');
+          const maxInput = row.querySelector('input[data-range][name$="_max"]');
+          const valuesInput = row.querySelector('[data-values]');
+          const mode = modeSelect ? modeSelect.value : 'FIXED';
+          let valuesText = '';
+          if (mode === 'RANGE') {
+            valuesText = `${formatValue(minInput?.value)} .. ${formatValue(maxInput?.value)}`.trim();
+          } else if (mode === 'LIST') {
+            valuesText = valuesInput?.value || '';
+          } else {
+            valuesText = valuesInput?.value || '';
+          }
+          const label = row.dataset.paramLabel || '';
+          const unit = row.dataset.paramUnit || '';
+          const groupKey = row.dataset.groupKey || 'general';
+
+          const tr = document.createElement('tr');
+          tr.className = `row-active group-row group-${groupKey}`;
+          tr.dataset.groupKey = groupKey;
+          tr.innerHTML = `
+            <td>${label}</td>
+            <td><span class="badge">${mode}</span></td>
+            <td>${valuesText}${unit ? ` ${unit}` : ''}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function parseListCount(raw) {
+        if (!raw) return 0;
+        return raw
+          .split(/[\s,;]+/)
+          .map((val) => parseFloat(val))
+          .filter((val) => Number.isFinite(val)).length;
+      }
+
+      function updateRunPreview() {
+        const preview = document.querySelector('[data-run-preview]');
+        if (!preview) return;
+        const designType = '<%= experiment.design_type %>';
+        const centerPoints = Number('<%= experiment.center_points %>');
+        const maxRuns = Number('<%= experiment.max_runs %>');
+        const replicateCount = Number('<%= experiment.replicate_count %>');
+        const recipeAsBlock = Number('<%= experiment.recipe_as_block %>');
+        const recipeCount = Number('<%= linkedRecipes.length %>');
+        const activeRows = Array.from(document.querySelectorAll('[data-param-row]')).filter((row) => {
+          const activeToggle = row.querySelector('[data-active-toggle]');
+          return activeToggle && activeToggle.checked;
+        });
+
+        const levelCounts = activeRows.map((row) => {
+          const modeSelect = row.querySelector('[data-mode-select]');
+          const valuesInput = row.querySelector('[data-values]');
+          const levelsSelect = row.querySelector('[data-levels]');
+          const mode = modeSelect ? modeSelect.value : 'FIXED';
+          if (mode === 'LIST') {
+            return parseListCount(valuesInput?.value || '');
+          }
+          if (mode === 'RANGE') {
+            const levels = Number(levelsSelect?.value || '2');
+            return levels === 3 ? 3 : 2;
+          }
+          return 1;
+        });
+
+        const threeLevelFlags = activeRows.map((row) => {
+          const modeSelect = row.querySelector('[data-mode-select]');
+          const valuesInput = row.querySelector('[data-values]');
+          const minInput = row.querySelector('input[data-range][name$="_min"]');
+          const maxInput = row.querySelector('input[data-range][name$="_max"]');
+          const mode = modeSelect ? modeSelect.value : 'FIXED';
+          if (mode === 'LIST') {
+            return parseListCount(valuesInput?.value || '') === 3;
+          }
+          if (mode === 'RANGE') {
+            if (designType === 'BBD') {
+              const minVal = parseFloat(minInput?.value || '');
+              const maxVal = parseFloat(maxInput?.value || '');
+              return Number.isFinite(minVal) && Number.isFinite(maxVal);
+            }
+            const levelsSelect = row.querySelector('[data-levels]');
+            return Number(levelsSelect?.value || '2') === 3;
+          }
+          return false;
+        });
+
+        let baseRuns = 0;
+        let formula = '';
+        let warning = '';
+        if (designType === 'SIM') {
+          baseRuns = levelCounts.length
+            ? levelCounts.reduce((acc, val) => acc * Math.max(val, 1), 1)
+            : 0;
+          formula = `SIM: product(levels) = ${baseRuns}`;
+        } else if (designType === 'FFA') {
+          baseRuns = levelCounts.length
+            ? levelCounts.reduce((acc, val) => acc * Math.max(val, 1), 1)
+            : 0;
+          formula = `FFA: product(levels) = ${baseRuns}`;
+        } else if (designType === 'BBD') {
+          const k = threeLevelFlags.filter(Boolean).length;
+          baseRuns = k >= 2 ? 4 * (k * (k - 1)) / 2 + (centerPoints || 0) : 0;
+          formula = `BBD: 4*C(k,2)+center = ${baseRuns} (k=${k})`;
+          if (k < 2) {
+            warning = `BBD needs at least 2 factors with 3 levels. Currently: ${k}. Set Levels=3 or use LIST with 3 values.`;
+          }
+        } else {
+          const k = levelCounts.length;
+          const fullCombos = k > 0 ? Math.pow(2, k) : 0;
+          baseRuns = Math.min(maxRuns || fullCombos, fullCombos);
+          formula = `SCREEN: min(max_runs, 2^k) = ${baseRuns} (k=${k})`;
+        }
+
+        const recipeMultiplier = recipeAsBlock === 1 && recipeCount > 0 ? recipeCount : 1;
+        const replicateMultiplier = Math.max(replicateCount || 1, 1);
+        const totalRuns = baseRuns * recipeMultiplier * replicateMultiplier;
+
+        const totalEl = document.querySelector('[data-run-total]');
+        const baseEl = document.querySelector('[data-run-base]');
+        const recipesEl = document.querySelector('[data-run-recipes]');
+        const repsEl = document.querySelector('[data-run-replicates]');
+        const formulaEl = document.querySelector('[data-run-formula]');
+        const warningEl = document.querySelector('[data-run-warning]');
+
+        if (totalEl) totalEl.textContent = String(totalRuns);
+        if (baseEl) baseEl.textContent = String(baseRuns);
+        if (recipesEl) recipesEl.textContent = String(recipeMultiplier);
+        if (repsEl) repsEl.textContent = String(replicateMultiplier);
+        if (formulaEl) formulaEl.textContent = formula;
+        if (warningEl) {
+          warningEl.style.display = warning ? '' : 'none';
+          warningEl.innerHTML = warning ? `<strong>${warning}</strong>` : '';
+        }
+      }
+
+      document.querySelectorAll('[data-param-row]').forEach((row) => {
+        row.addEventListener('change', updateFactorSummary);
+        row.addEventListener('blur', updateFactorSummary, true);
+        row.addEventListener('change', updateRunPreview);
+        row.addEventListener('blur', updateRunPreview, true);
+      });
+      updateFactorSummary();
+      updateRunPreview();
+
+      function applyGroupColors() {
+        const chips = Array.from(document.querySelectorAll('.group-chip')).filter((chip) => {
+          return chip.dataset.groupFilter && chip.dataset.groupFilter !== 'all';
+        });
+        const palette = [18, 42, 90, 140, 200, 250, 300, 330];
+        chips.forEach((chip, idx) => {
+          const hue = palette[idx % palette.length];
+          const color = `hsl(${hue} 60% 40%)`;
+          const bg = `hsla(${hue} 60% 92% / 0.6)`;
+          chip.style.setProperty('--chip-color', color);
+          chip.style.setProperty('--chip-bg', bg);
+          const key = chip.dataset.groupFilter;
+          document.querySelectorAll(`[data-group-key="${key}"]`).forEach((row) => {
+            row.style.setProperty('--group-color', color);
+            row.style.setProperty('--group-bg', bg);
+          });
+        });
+      }
+
+      function wireGroupFilter() {
+        const container = document.querySelector('[data-group-filter]');
+        if (!container) return;
+        container.addEventListener('click', (event) => {
+          const target = event.target.closest('.group-chip');
+          if (!target) return;
+          const key = target.dataset.groupFilter || 'all';
+          container.querySelectorAll('.group-chip').forEach((chip) => {
+            chip.classList.toggle('active', chip === target);
+          });
+          document.querySelectorAll('[data-param-row]').forEach((row) => {
+            const rowKey = row.dataset.groupKey;
+            row.style.display = key === 'all' || rowKey === key ? '' : 'none';
+          });
+        });
+      }
+
+      applyGroupColors();
+      wireGroupFilter();
     </script>
   <% } %>
 
@@ -279,13 +598,17 @@
 
   <% if (tab === 'analysis') { %>
     <div class="card">
-      <h2 class="card-title">Analysis Controls</h2>
+      <div class="card-header">
+        <h2 class="card-title">Analysis Controls</h2>
+        <button class="pure-button pure-button-secondary" type="button" id="openMeasuredFieldsDialog">Manage measured fields</button>
+      </div>
+      <p class="small-note" id="noActiveNumericOutputs" <%= outputNumericParams.length === 0 ? '' : 'style="display:none;"' %>><strong>No active numeric outputs.</strong> Enable measured fields to run analysis.</p>
       <form class="pure-form pure-form-stacked" method="get" action="/experiments/<%= experiment.id %>">
         <input type="hidden" name="tab" value="analysis">
         <div class="grid-two">
           <div>
             <label>Output</label>
-            <select name="output_param">
+            <select name="output_param" id="outputParamSelect">
               <% outputNumericParams.forEach((param) => { %>
                 <option value="<%= param.id %>" <%= analysis?.outputParamId === param.id ? 'selected' : '' %>><%= param.label %></option>
               <% }); %>
@@ -309,23 +632,57 @@
           </div>
           <div>
             <label>Recipe Filter</label>
-            <select name="recipe_id">
-              <option value="">All</option>
-              <% recipes.forEach((recipe) => { %>
-                <option value="<%= recipe.id %>" <%= analysis?.recipeId === recipe.id ? 'selected' : '' %>><%= recipe.name %></option>
+            <% if (linkedRecipeOptions.length > 0) { %>
+              <select name="recipe_id">
+                <option value="">All</option>
+                <% linkedRecipeOptions.forEach((recipe) => { %>
+                  <option value="<%= recipe.id %>" <%= analysis?.recipeId === recipe.id ? 'selected' : '' %>><%= recipe.name %></option>
+                <% }); %>
+              </select>
+            <% } else { %>
+              <div class="small-note">No linked recipes.</div>
+            <% } %>
+          </div>
+          <div>
+            <label>Tag Field</label>
+            <select name="tag_field" id="tagFieldSelect">
+              <option value="">None</option>
+              <% tagOutputFields.forEach((field) => { %>
+                <option value="<%= field.id %>" <%= analysis?.tagFieldId === field.id ? 'selected' : '' %>><%= field.label %></option>
               <% }); %>
             </select>
           </div>
           <div>
-            <label>Defect Tag Filter</label>
-            <input type="text" name="defect_tag" placeholder="flash" value="<%= analysis?.defectTag || '' %>">
+            <label>Tag Value</label>
+            <select id="tagValueSelect">
+              <option value="">Select tag</option>
+            </select>
+            <div class="tag-cloud" id="tagValueChips"></div>
+            <div id="tagValueInputs"></div>
+          </div>
+          <div>
+            <label>Boolean Field</label>
+            <select name="bool_field" id="boolFieldSelect">
+              <option value="">None</option>
+              <% booleanOutputFields.forEach((field) => { %>
+                <option value="<%= field.id %>" <%= analysis?.boolFieldId === field.id ? 'selected' : '' %>><%= field.label %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div>
+            <label>Boolean Value</label>
+            <select name="bool_value">
+              <option value="">Any</option>
+              <option value="1" <%= analysis?.boolValue === 1 ? 'selected' : '' %>>True</option>
+              <option value="0" <%= analysis?.boolValue === 0 ? 'selected' : '' %>>False</option>
+            </select>
           </div>
         </div>
         <button class="pure-button pure-button-primary" type="submit">Update Analysis</button>
       </form>
     </div>
 
-    <div class="grid-two">
+    <div class="grid-two chart-grid">
       <div class="card chart-card" id="lineChart"></div>
       <div class="card chart-card" id="heatmapChart"></div>
       <div class="card chart-card" id="scatterChart"></div>
@@ -346,6 +703,16 @@
         (SD <%= Number.isFinite(analysis?.overall?.sd) ? analysis.overall.sd.toFixed(3) : 'n/a' %>,
         n=<%= analysis?.overall?.n ?? 0 %>)
       </div>
+      <% if (analysis?.tagPenaltyRate != null) { %>
+        <div>
+          <strong>Tag rate:</strong> <%= (analysis.tagPenaltyRate * 100).toFixed(1) %>%
+        </div>
+      <% } %>
+      <% if (analysis?.boolPenaltyRate != null) { %>
+        <div>
+          <strong>Boolean rate:</strong> <%= (analysis.boolPenaltyRate * 100).toFixed(1) %>%
+        </div>
+      <% } %>
       <table class="pure-table table-compact" style="margin-top: 1rem;">
         <thead>
           <tr>
@@ -372,25 +739,85 @@
     </div>
 
     <script src="/vendor/echarts/dist/echarts.min.js"></script>
-    <script src="/vendor/echarts-gl/dist/echarts-gl.min.js"></script>
     <script>
       const summary = <%- JSON.stringify(analysis?.summary || []) %>;
       const heatmap = <%- JSON.stringify(analysis?.heatmap || []) %>;
       const scatter = <%- JSON.stringify(analysis?.scatter || []) %>;
       const scatter3dData = <%- JSON.stringify(analysis?.scatter3d || []) %>;
+      const inputMeta = <%- JSON.stringify(activeInputParams.map((p) => ({ id: p.id, label: p.label, unit: p.unit || '' }))) %>;
+      const outputMeta = <%- JSON.stringify(outputNumericParams.map((p) => ({ id: p.id, label: p.label, unit: p.unit || '' }))) %>;
+      const selectedOutputId = <%- JSON.stringify(analysis?.outputParamId || null) %>;
+      const selectedXId = <%- JSON.stringify(analysis?.xParamId || null) %>;
+      const selectedYId = <%- JSON.stringify(analysis?.yParamId || null) %>;
 
       const lineChart = echarts.init(document.getElementById('lineChart'));
-      const upper = summary.map(s => s.mean + (s.sd || 0));
-      const lower = summary.map(s => s.mean - (s.sd || 0));
+      const finite = (value) => Number.isFinite(value);
+      const extent = (values) => {
+        const filtered = values.filter(finite);
+        if (!filtered.length) return null;
+        return [Math.min(...filtered), Math.max(...filtered)];
+      };
+      const pad = (range, ratio = 0.08) => {
+        if (!range) return null;
+        const [min, max] = range;
+        if (min === max) return [min - 1, max + 1];
+        const span = (max - min) * ratio;
+        return [min - span, max + span];
+      };
+      const metaMap = (list) => new Map(list.map((item) => [item.id, item]));
+      const inputMap = metaMap(inputMeta);
+      const outputMap = metaMap(outputMeta);
+      const formatLabel = (meta) => (meta ? `${meta.label}${meta.unit ? ` (${meta.unit})` : ''}` : '');
+      const xLabel = formatLabel(inputMap.get(selectedXId));
+      const yLabel = formatLabel(inputMap.get(selectedYId));
+      const outputLabel = formatLabel(outputMap.get(selectedOutputId));
+      const sdScale = 1;
+      const upper = summary.map(s => s.mean + (s.sd || 0) * sdScale);
+      const lower = summary.map(s => s.mean - (s.sd || 0) * sdScale);
+      const band = upper.map((val, idx) => val - lower[idx]);
+      const yRange = pad(extent([...upper, ...lower, ...summary.map(s => s.mean)]));
       lineChart.setOption({
         title: { text: 'Mean vs Factor' },
         tooltip: {},
-        xAxis: { type: 'category', data: summary.map(s => s.factor) },
-        yAxis: { type: 'value' },
+        xAxis: {
+          type: 'category',
+          data: summary.map(s => s.factor),
+          name: xLabel,
+          nameLocation: 'middle',
+          nameGap: 28
+        },
+        yAxis: {
+          type: 'value',
+          min: yRange ? yRange[0] : undefined,
+          max: yRange ? yRange[1] : undefined,
+          name: outputLabel,
+          nameLocation: 'middle',
+          nameGap: 40,
+          axisLabel: {
+            formatter: (val) => Number.isFinite(val) ? Number(val).toFixed(2) : val
+          }
+        },
         series: [
-          { type: 'line', data: summary.map(s => s.mean), smooth: true, name: 'Mean' },
-          { type: 'line', data: upper, smooth: true, lineStyle: { type: 'dashed' }, name: '+SD' },
-          { type: 'line', data: lower, smooth: true, lineStyle: { type: 'dashed' }, name: '-SD' }
+          {
+            type: 'line',
+            data: lower,
+            smooth: true,
+            stack: 'sd',
+            lineStyle: { opacity: 0 },
+            showSymbol: false,
+            emphasis: { disabled: true }
+          },
+          {
+            type: 'line',
+            data: band,
+            smooth: true,
+            stack: 'sd',
+            lineStyle: { opacity: 0 },
+            showSymbol: false,
+            areaStyle: { opacity: 0.2, color: '#5b8ff9' },
+            name: `Mean ± ${sdScale} SD`
+          },
+          { type: 'line', data: summary.map(s => s.mean), smooth: true, name: 'Mean' }
         ]
       });
 
@@ -398,6 +825,7 @@
       const xVals = [...new Set(heatmap.map(h => h.x))].sort((a,b) => a-b);
       const yVals = [...new Set(heatmap.map(h => h.y))].sort((a,b) => a-b);
       const heatmapData = heatmap.map(h => [xVals.indexOf(h.x), yVals.indexOf(h.y), h.mean, h.sd, h.n]);
+      const heatExtent = extent(heatmap.map(h => h.mean));
       heatmapChart.setOption({
         title: { text: 'Heatmap' },
         tooltip: {
@@ -406,19 +834,69 @@
             return `Mean: ${mean?.toFixed ? mean.toFixed(3) : mean}<br>SD: ${sd?.toFixed ? sd.toFixed(3) : sd}<br>N: ${n}`;
           }
         },
-        xAxis: { type: 'category', data: xVals },
-        yAxis: { type: 'category', data: yVals },
-        visualMap: { min: 0, max: 100, calculable: true, orient: 'horizontal' },
+        xAxis: {
+          type: 'category',
+          data: xVals,
+          name: xLabel,
+          nameLocation: 'middle',
+          nameGap: 28
+        },
+        yAxis: {
+          type: 'category',
+          data: yVals,
+          name: yLabel,
+          nameLocation: 'middle',
+          nameGap: 40
+        },
+        visualMap: {
+          dimension: 2,
+          min: heatExtent ? heatExtent[0] : 0,
+          max: heatExtent ? heatExtent[1] : 1,
+          calculable: true,
+          orient: 'horizontal',
+          text: [outputLabel || 'Output', ''],
+          formatter: (val) => Number.isFinite(val) ? Number(val).toFixed(2) : val,
+          inRange: {
+            color: ['#fff1a6', '#f6b26b', '#d64545']
+          }
+        },
         series: [{ type: 'heatmap', data: heatmapData }]
       });
 
       const scatterChart = echarts.init(document.getElementById('scatterChart'));
       const recipes = [...new Set(scatter.map(s => s.recipe_id))];
+      const scatterX = pad(extent(scatter.map(s => s.x)));
+      const scatterY = pad(extent(scatter.map(s => s.y)));
       scatterChart.setOption({
         title: { text: 'Scatter' },
-        tooltip: {},
-        xAxis: { type: 'value' },
-        yAxis: { type: 'value' },
+        tooltip: {
+          formatter: (params) => {
+            const [x, y] = params.data || [];
+            return `${xLabel}: ${x}<br>${outputLabel}: ${y}`;
+          }
+        },
+        xAxis: {
+          type: 'value',
+          min: scatterX ? scatterX[0] : undefined,
+          max: scatterX ? scatterX[1] : undefined,
+          name: xLabel,
+          nameLocation: 'middle',
+          nameGap: 28,
+          axisLabel: {
+            formatter: (val) => Number.isFinite(val) ? Number(val).toFixed(2) : val
+          }
+        },
+        yAxis: {
+          type: 'value',
+          min: scatterY ? scatterY[0] : undefined,
+          max: scatterY ? scatterY[1] : undefined,
+          name: outputLabel,
+          nameLocation: 'middle',
+          nameGap: 40,
+          axisLabel: {
+            formatter: (val) => Number.isFinite(val) ? Number(val).toFixed(2) : val
+          }
+        },
         visualMap: {
           type: 'piecewise',
           dimension: 2,
@@ -430,23 +908,519 @@
         series: [{ type: 'scatter', data: scatter.map(s => [s.x, s.y, s.recipe_id]) }]
       });
 
-      const scatter3d = echarts.init(document.getElementById('scatter3d'));
-      const has3d = scatter3dData.length > 12;
-      scatter3d.setOption({
-        title: { text: has3d ? '3D Surface Preview' : '3D (insufficient data)' },
-        tooltip: {},
-        xAxis3D: { type: 'value' },
-        yAxis3D: { type: 'value' },
-        zAxis3D: { type: 'value' },
-        grid3D: { viewControl: { projection: 'perspective' } },
+      const responseChart = echarts.init(document.getElementById('scatter3d'));
+      const responseX = pad(extent(scatter3dData.map(h => h.x)));
+      const responseY = pad(extent(scatter3dData.map(h => h.y)));
+      const responseZ = pad(extent(scatter3dData.map(h => h.z)));
+      responseChart.setOption({
+        title: { text: scatter3dData.length > 8 ? 'Response Surface (color)' : 'Response Surface (insufficient data)' },
+        tooltip: {
+          formatter: (params) => {
+            const [x, y, z] = params.data || [];
+            return `${xLabel}: ${x}<br>${yLabel}: ${y}<br>${outputLabel}: ${z}`;
+          }
+        },
+        xAxis: {
+          type: 'value',
+          min: responseX ? responseX[0] : undefined,
+          max: responseX ? responseX[1] : undefined,
+          name: xLabel,
+          nameLocation: 'middle',
+          nameGap: 28,
+          axisLabel: {
+            formatter: (val) => Number.isFinite(val) ? Number(val).toFixed(2) : val
+          }
+        },
+        yAxis: {
+          type: 'value',
+          min: responseY ? responseY[0] : undefined,
+          max: responseY ? responseY[1] : undefined,
+          name: yLabel,
+          nameLocation: 'middle',
+          nameGap: 40,
+          axisLabel: {
+            formatter: (val) => Number.isFinite(val) ? Number(val).toFixed(2) : val
+          }
+        },
+        visualMap: {
+          min: responseZ ? responseZ[0] : 0,
+          max: responseZ ? responseZ[1] : 1,
+          calculable: true,
+          orient: 'horizontal',
+          text: [outputLabel || 'Output', ''],
+          formatter: (val) => Number.isFinite(val) ? Number(val).toFixed(2) : val
+        },
         series: [
           {
-            type: 'scatter3D',
-            data: scatter3dData.map(h => [h.x, h.y, h.z])
+            type: 'scatter',
+            data: scatter3dData.map(h => [h.x, h.y, h.z]),
+            symbolSize: 14
           }
         ]
+      });
+
+      const charts = [lineChart, heatmapChart, scatterChart, responseChart];
+      window.addEventListener('resize', () => {
+        charts.forEach((chart) => chart.resize());
       });
     </script>
   <% } %>
 </div>
+
+<dialog id="measuredFieldsDialog" class="modal-frame">
+  <div class="modal-header">
+    <strong>Measured Fields</strong>
+    <button class="pure-button" type="button" data-close>Close</button>
+  </div>
+  <div class="modal-body">
+    <div class="card">
+      <h2 class="card-title">Standard fields</h2>
+      <p class="small-note">Activate per experiment. Deactivating keeps stored data.</p>
+      <form method="POST" action="/experiments/<%= experiment.id %>/analysis-fields/standard" data-autosave="standard">
+        <div class="field-grid">
+          <% standardAnalysisFields.forEach((field) => { %>
+            <label class="field-chip" data-standard-chip data-group-label="<%= field.group_label || 'Custom' %>">
+              <input type="checkbox" name="standard_codes" value="<%= field.code %>" <%= field.is_active ? 'checked' : '' %>>
+              <div class="field-content">
+                <div class="field-title"><%= field.label %></div>
+                <div class="field-meta">
+                  <%= field.field_type %>
+                  <% if (field.unit) { %> · <%= field.unit %><% } %>
+                  <% if (field.group_label) { %> · <%= field.group_label %><% } %>
+                </div>
+              </div>
+            </label>
+          <% }); %>
+        </div>
+        <div style="margin-top: 1rem;">
+          <button class="pure-button pure-button-primary" type="submit">Save standard fields</button>
+          <span class="small-note" data-autosave-status></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top: 1rem;">
+      <h2 class="card-title">Custom fields</h2>
+      <% if (customAnalysisFields.length === 0) { %>
+        <p class="small-note" id="customFieldsEmpty">No custom fields yet.</p>
+      <% } %>
+      <form method="POST" action="/experiments/<%= experiment.id %>/analysis-fields/custom" data-autosave="custom" id="customFieldsForm">
+        <div class="table-wrap">
+          <table class="pure-table table-compact field-table">
+            <thead>
+              <tr>
+                <th>Active</th>
+                <th>Label</th>
+                <th>Type</th>
+                <th>Unit</th>
+                <th>Group</th>
+                <th>Allowed values</th>
+              </tr>
+            </thead>
+            <tbody id="customFieldsBody">
+                <% customAnalysisFields.forEach((field) => { %>
+                  <tr>
+                    <td>
+                      <input type="hidden" name="custom[<%= field.id %>][is_active]" value="0">
+                      <input type="checkbox" name="custom[<%= field.id %>][is_active]" value="1" <%= field.is_active ? 'checked' : '' %> data-custom-active data-field-id="<%= field.id %>">
+                    </td>
+                  <td><input name="custom[<%= field.id %>][label]" value="<%= field.label %>"></td>
+                  <td><span class="badge"><%= field.field_type %></span></td>
+                  <td><input name="custom[<%= field.id %>][unit]" value="<%= field.unit || '' %>"></td>
+                  <td><input name="custom[<%= field.id %>][group_label]" value="<%= field.group_label || '' %>"></td>
+                  <td>
+                    <input name="custom[<%= field.id %>][allowed_values]" value="<%= field.allowedValues ? field.allowedValues.join(', ') : '' %>" <%= field.field_type === 'tag' ? '' : 'disabled' %>>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top: 1rem;">
+          <button class="pure-button pure-button-primary" type="submit">Save custom fields</button>
+          <span class="small-note" data-autosave-status></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top: 1rem;">
+      <h2 class="card-title">Add new field</h2>
+      <form method="POST" action="/experiments/<%= experiment.id %>/analysis-fields/new" id="analysisFieldCreateForm">
+        <div class="grid-two">
+          <div>
+            <label>Label</label>
+            <input name="label" required>
+          </div>
+          <div>
+            <label>Code</label>
+            <input name="code" placeholder="part_weight_g">
+          </div>
+          <div>
+            <label>Type</label>
+            <select name="field_type">
+              <option value="number">Number</option>
+              <option value="text">Text</option>
+              <option value="tag">Tag</option>
+              <option value="boolean">Boolean</option>
+            </select>
+          </div>
+          <div>
+            <label>Unit</label>
+            <input name="unit">
+          </div>
+          <div>
+            <label>Group</label>
+            <input name="group_label">
+          </div>
+          <div>
+            <label>Allowed values (tags)</label>
+            <input name="allowed_values" placeholder="short_shot, flash">
+          </div>
+        </div>
+        <div style="margin-top: 1rem;">
+          <button class="pure-button pure-button-primary" type="submit">Add field</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="pure-button" type="button" data-close>Close</button>
+  </div>
+</dialog>
+
+<script>
+  const measuredDialog = document.getElementById('measuredFieldsDialog');
+  const openMeasuredDialog = document.getElementById('openMeasuredFieldsDialog');
+  if (openMeasuredDialog && measuredDialog) {
+    openMeasuredDialog.addEventListener('click', () => measuredDialog.showModal());
+  }
+  if (measuredDialog) {
+    measuredDialog.querySelectorAll('[data-close]').forEach((btn) => {
+      btn.addEventListener('click', () => measuredDialog.close());
+    });
+  }
+
+  const createForm = document.getElementById('analysisFieldCreateForm');
+  if (createForm) {
+    const labelInput = createForm.querySelector('input[name="label"]');
+    const codeInput = createForm.querySelector('input[name="code"]');
+    let codeTouched = false;
+    if (codeInput) {
+      codeInput.addEventListener('input', () => {
+        codeTouched = codeInput.value.trim().length > 0;
+      });
+    }
+    if (labelInput && codeInput) {
+      labelInput.addEventListener('input', () => {
+        if (codeTouched) return;
+        const slug = labelInput.value
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+        codeInput.value = slug;
+      });
+    }
+  }
+
+  function setupAutosave(form) {
+    if (!form) return;
+    const status = form.querySelector('[data-autosave-status]');
+    let timer = null;
+
+    const submit = () => {
+      const body = new URLSearchParams(new FormData(form));
+      if (status) status.textContent = 'Saving...';
+      return fetch(form.action, {
+        method: form.method || 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error('Save failed');
+          if (status) status.textContent = 'Saved';
+          return true;
+        })
+        .catch(() => {
+          if (status) status.textContent = 'Save failed';
+          return false;
+        });
+    };
+
+    const schedule = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        submit().then((ok) => {
+          if (ok) refreshActiveFields();
+        });
+      }, 200);
+    };
+
+    form.addEventListener('change', (event) => {
+      if (event.target && event.target.matches('input, select, textarea')) {
+        schedule();
+      }
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      submit().then((ok) => {
+        if (ok) refreshActiveFields();
+      });
+    });
+  }
+
+  const outputSelect = document.getElementById('outputParamSelect');
+  const tagSelect = document.getElementById('tagFieldSelect');
+  const boolSelect = document.getElementById('boolFieldSelect');
+  const tagValueSelect = document.getElementById('tagValueSelect');
+  const tagValueChips = document.getElementById('tagValueChips');
+  const tagValueInputs = document.getElementById('tagValueInputs');
+  const noNumericNote = document.getElementById('noActiveNumericOutputs');
+  const initialTagValues = <%- JSON.stringify(analysis?.tagValues || []) %>;
+
+  function setOptions(select, options, includeNone) {
+    if (!select) return;
+    const current = select.value;
+    const fragment = document.createDocumentFragment();
+    if (includeNone) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'None';
+      fragment.appendChild(opt);
+    }
+    options.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = String(option.id);
+      opt.textContent = option.label;
+      fragment.appendChild(opt);
+    });
+    select.innerHTML = '';
+    select.appendChild(fragment);
+    const stillExists = options.some((opt) => String(opt.id) === current);
+    if (stillExists) {
+      select.value = current;
+    } else if (!includeNone && options.length > 0) {
+      select.value = String(options[0].id);
+    } else {
+      select.value = '';
+    }
+  }
+
+  function refreshActiveFields() {
+    return fetch(`/experiments/<%= experiment.id %>/analysis-fields/active`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then((res) => res.json())
+      .then((payload) => {
+        const fields = Array.isArray(payload.fields) ? payload.fields : [];
+        const numeric = fields.filter((field) => field.field_type === 'number');
+        const tags = fields.filter((field) => field.field_type === 'tag');
+        const bools = fields.filter((field) => field.field_type === 'boolean');
+        setOptions(outputSelect, numeric, false);
+        setOptions(tagSelect, tags, true);
+        setOptions(boolSelect, bools, true);
+        if (noNumericNote) {
+          noNumericNote.style.display = numeric.length === 0 ? '' : 'none';
+        }
+        if (outputSelect) outputSelect.disabled = numeric.length === 0;
+        refreshTagValues(false);
+      })
+      .catch(() => {
+        // Ignore refresh errors; page still works on reload.
+      });
+  }
+
+  function renderTagChips(selected) {
+    if (!tagValueChips || !tagValueInputs) return;
+    tagValueChips.innerHTML = '';
+    tagValueInputs.innerHTML = '';
+    selected.forEach((tag) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip tag-chip-remove';
+      const label = tag === '__none__' ? 'No tags' : tag;
+      chip.innerHTML = `<span>${label}</span><button type="button" aria-label="Remove ${label}">×</button>`;
+      chip.querySelector('button').addEventListener('click', () => {
+        selected.delete(tag);
+        renderTagChips(selected);
+      });
+      tagValueChips.appendChild(chip);
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'tag_value';
+      input.value = tag;
+      tagValueInputs.appendChild(input);
+    });
+  }
+
+  function setTagOptions(values) {
+    if (!tagValueSelect) return;
+    const fragment = document.createDocumentFragment();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Select tag';
+    fragment.appendChild(placeholder);
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '__none__';
+    noneOpt.textContent = 'No tags';
+    fragment.appendChild(noneOpt);
+    values.forEach((value) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = value;
+      fragment.appendChild(opt);
+    });
+    tagValueSelect.innerHTML = '';
+    tagValueSelect.appendChild(fragment);
+  }
+
+  function refreshTagValues(clearSelection) {
+    if (!tagSelect || !tagValueSelect) return;
+    const fieldId = tagSelect.value;
+    if (!fieldId) {
+      setTagOptions([]);
+      if (clearSelection && selectedTags) selectedTags.clear();
+      renderTagChips(selectedTags);
+      return;
+    }
+    fetch(`/experiments/<%= experiment.id %>/analysis-fields/tag-values?field_id=${fieldId}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then((res) => res.json())
+      .then((payload) => {
+        const values = Array.isArray(payload.values) ? payload.values : [];
+        setTagOptions(values);
+        if (clearSelection && selectedTags) selectedTags.clear();
+        renderTagChips(selectedTags);
+      })
+      .catch(() => {
+        // Ignore tag refresh errors.
+      });
+  }
+
+  const selectedTags = new Set(initialTagValues);
+  renderTagChips(selectedTags);
+  refreshTagValues(false);
+
+  if (tagSelect) {
+    tagSelect.addEventListener('change', () => {
+      refreshTagValues(true);
+    });
+  }
+
+  if (tagValueSelect) {
+    tagValueSelect.addEventListener('change', () => {
+      const value = tagValueSelect.value;
+      if (!value) return;
+      selectedTags.add(value);
+      renderTagChips(selectedTags);
+      tagValueSelect.value = '';
+    });
+  }
+
+  setupAutosave(document.querySelector('form[data-autosave="standard"]'));
+  setupAutosave(document.querySelector('form[data-autosave="custom"]'));
+
+  if (createForm) {
+    const customBody = document.getElementById('customFieldsBody');
+    const customEmpty = document.getElementById('customFieldsEmpty');
+
+    const buildCustomRow = (field) => {
+      const row = document.createElement('tr');
+      const allowedValues = Array.isArray(field.allowed_values) ? field.allowed_values : [];
+      const allowedValueText = allowedValues.join(', ');
+      row.innerHTML = `
+        <td>
+          <input type="hidden" name="custom[${field.id}][is_active]" value="0">
+          <input type="checkbox" name="custom[${field.id}][is_active]" value="1" ${field.is_active ? 'checked' : ''} data-custom-active data-field-id="${field.id}">
+        </td>
+        <td><input name="custom[${field.id}][label]" value="${field.label || ''}"></td>
+        <td><span class="badge">${field.field_type}</span></td>
+        <td><input name="custom[${field.id}][unit]" value="${field.unit || ''}"></td>
+        <td><input name="custom[${field.id}][group_label]" value="${field.group_label || ''}"></td>
+        <td>
+          <input name="custom[${field.id}][allowed_values]" value="${allowedValueText}" ${field.field_type === 'tag' ? '' : 'disabled'}>
+        </td>
+      `;
+      return row;
+    };
+
+    createForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const body = new URLSearchParams(new FormData(createForm));
+      fetch(createForm.action, {
+        method: createForm.method || 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error('Create failed');
+          return res.json();
+        })
+        .then((payload) => {
+          if (!payload || !payload.field) return;
+          if (customBody) {
+            customBody.appendChild(buildCustomRow(payload.field));
+          }
+          if (customEmpty) customEmpty.remove();
+          createForm.reset();
+          refreshActiveFields();
+        })
+        .catch(() => {
+          // Keep the form values so user can retry.
+        });
+    });
+  }
+
+  if (measuredDialog) {
+    const updateChip = (chip) => {
+      const input = chip.querySelector('input[type="checkbox"]');
+      if (!input) return;
+      chip.classList.toggle('is-active', input.checked);
+    };
+    const palette = [18, 42, 90, 140, 200, 250, 300, 330];
+    const groupColors = new Map();
+    measuredDialog.querySelectorAll('[data-standard-chip]').forEach((chip) => {
+      updateChip(chip);
+      const label = chip.dataset.groupLabel || 'Custom';
+      if (!groupColors.has(label)) {
+        const hue = palette[groupColors.size % palette.length];
+        groupColors.set(label, {
+          accent: `hsl(${hue} 60% 42%)`,
+          bg: `hsla(${hue} 60% 92% / 0.9)`
+        });
+      }
+      const colors = groupColors.get(label);
+      chip.style.setProperty('--group-accent', colors.accent);
+      chip.style.setProperty('--group-bg', colors.bg);
+    });
+    measuredDialog.addEventListener('change', (event) => {
+      const checkbox = event.target;
+      const chip = checkbox && checkbox.closest('[data-standard-chip]');
+      if (chip) updateChip(chip);
+      if (!checkbox || !checkbox.matches('[data-custom-active]')) return;
+      const fieldId = checkbox.getAttribute('data-field-id');
+      if (!fieldId) return;
+      const params = new URLSearchParams();
+      params.set('field_id', fieldId);
+      params.set('is_active', checkbox.checked ? '1' : '0');
+      fetch(`/experiments/<%= experiment.id %>/analysis-fields/custom/active`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: params
+      })
+        .then(() => refreshActiveFields())
+        .catch(() => {
+          // Ignore network errors; user can retry by toggling.
+        });
+    });
+  }
+</script>
 <%- include('partials/foot') %>

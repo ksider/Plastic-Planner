@@ -100,6 +100,13 @@ export function upsertParamConfig(db: Db, config: Omit<ParamConfig, "id">) {
   }
 }
 
+export function deleteParamConfig(db: Db, experimentId: number, paramDefId: number) {
+  db.prepare("DELETE FROM param_configs WHERE experiment_id = ? AND param_def_id = ?").run(
+    experimentId,
+    paramDefId
+  );
+}
+
 export function createParamDefinition(db: Db, def: Omit<ParamDefinition, "id">): number {
   const result = db
     .prepare(

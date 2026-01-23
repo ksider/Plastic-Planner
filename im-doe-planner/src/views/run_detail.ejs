@@ -58,30 +58,48 @@
     </div>
 
     <div class="card">
-      <h2 class="card-title">Outputs</h2>
-      <div class="grid-two">
-        <% outputParams.forEach((param) => { const value = valueMap.get(param.id); %>
-          <div>
-            <label><%= param.label %> <span class="small-note"><%= param.unit || '' %></span></label>
-            <% if (param.field_type === 'tag') { %>
-              <% const tags = param.allowed_values_json ? JSON.parse(param.allowed_values_json) : []; %>
-              <% const selected = value?.value_tags_json ? JSON.parse(value.value_tags_json) : []; %>
-              <div class="tag-cloud">
-                <% tags.forEach((tag) => { %>
-                  <label class="pure-checkbox">
-                    <input type="checkbox" name="param_<%= param.id %>_tags" value="<%= tag %>" <%= selected.includes(tag) ? 'checked' : '' %>>
-                    <span class="tag-chip"><%= tag %></span>
-                  </label>
-                <% }); %>
-              </div>
-            <% } else if (param.field_type === 'text') { %>
-              <input type="text" name="param_<%= param.id %>" value="<%= value?.value_text ?? '' %>">
-            <% } else { %>
-              <input type="number" step="any" name="param_<%= param.id %>" value="<%= value?.value_real ?? '' %>">
-            <% } %>
-          </div>
-        <% }); %>
+      <div class="card-header">
+        <h2 class="card-title">Measured Outputs</h2>
+        <a class="pure-button pure-button-secondary" href="/experiments/<%= experiment.id %>?tab=analysis">Manage measured fields</a>
       </div>
+      <% if (analysisGroups.length === 0) { %>
+        <p class="small-note">No active measured fields. Enable them in the Analysis tab.</p>
+      <% } %>
+      <% analysisGroups.forEach((group) => { %>
+        <div class="output-group">
+          <div class="small-note"><strong><%= group.group %></strong></div>
+          <div class="outputs-grid">
+            <% group.fields.forEach((field) => { const valueRow = analysisValueMap.get(field.id); %>
+              <div class="<%= field.field_type === 'tag' ? 'output-card output-tags' : 'output-card' %>">
+                <label><%= field.label %> <span class="small-note"><%= field.unit || '' %></span></label>
+                <% if (field.field_type === 'tag') { %>
+                  <% let selected = []; %>
+                  <% if (valueRow?.value_tags_json) { try { const parsed = JSON.parse(valueRow.value_tags_json); if (Array.isArray(parsed)) selected = parsed.map(String); } catch {} } %>
+                  <input type="hidden" name="analysis_<%= field.id %>" value="">
+                  <div class="tag-grid">
+                    <% field.allowedValues.forEach((tag) => { %>
+                      <label class="tag-toggle">
+                        <input type="checkbox" name="analysis_<%= field.id %>" value="<%= tag %>" <%= selected.includes(tag) ? 'checked' : '' %>>
+                        <span class="tag-chip"><%= tag %></span>
+                      </label>
+                    <% }); %>
+                  </div>
+                <% } else if (field.field_type === 'text') { %>
+                  <input type="text" name="analysis_<%= field.id %>" value="<%= valueRow?.value_text ?? '' %>">
+                <% } else if (field.field_type === 'boolean') { %>
+                  <label class="toggle">
+                    <input type="hidden" name="analysis_<%= field.id %>" value="0">
+                    <input type="checkbox" name="analysis_<%= field.id %>" value="1" <%= valueRow?.value_real ? 'checked' : '' %>>
+                    <span class="track"></span>
+                  </label>
+                <% } else { %>
+                  <input type="number" step="any" name="analysis_<%= field.id %>" value="<%= valueRow?.value_real ?? '' %>">
+                <% } %>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      <% }); %>
     </div>
 
     <div class="card">

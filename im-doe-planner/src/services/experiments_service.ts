@@ -3,6 +3,7 @@ import {
   createExperiment,
   getExperiment,
   getExperimentRecipes,
+  getDesignMetadata,
   setExperimentRecipes,
   upsertDesignMetadata
 } from "../repos/experiments_repo.js";
@@ -16,7 +17,6 @@ import { deleteRunsForExperiment, insertRuns } from "../repos/runs_repo.js";
 import type { ParamDefinition, ParamConfig } from "../repos/params_repo.js";
 import { buildBbdDesign, buildFfaDesign, buildScreenDesign, buildSimDesign } from "../domain/designs.js";
 import { stableHash } from "../lib/hash.js";
-import { DEFAULT_INPUT_VALUES } from "./seed.js";
 
 export type ExperimentCreateInput = {
   name: string;
@@ -29,6 +29,48 @@ export type ExperimentCreateInput = {
   recipe_as_block?: number;
   recipe_ids?: number[];
 };
+
+type DefaultFactorConfig = {
+  code: string;
+  mode: "RANGE" | "LIST";
+  rangeMin?: number;
+  rangeMax?: number;
+  list?: number[];
+  levelCount?: number | null;
+};
+
+export function getDefaultActiveFactors(designType: string): DefaultFactorConfig[] {
+  if (designType === "BBD") {
+    return [
+      { code: "barrel_zone5", mode: "RANGE", rangeMin: 80, rangeMax: 120, levelCount: 3 },
+      { code: "inj_speed", mode: "RANGE", rangeMin: 20, rangeMax: 50, levelCount: 3 },
+      { code: "v_to_p_transfer", mode: "RANGE", rangeMin: 92, rangeMax: 98, levelCount: 3 }
+    ];
+  }
+  if (designType === "FFA") {
+    return [
+      { code: "moisture_pct", mode: "LIST", list: [0, 1, 2], levelCount: 3 },
+      { code: "inj_speed", mode: "LIST", list: [25, 40, 60], levelCount: 3 },
+      { code: "hold_time", mode: "LIST", list: [2, 5, 8], levelCount: 3 }
+    ];
+  }
+  if (designType === "SIM") {
+    return [
+      { code: "barrel_zone5", mode: "RANGE", rangeMin: 80, rangeMax: 120, levelCount: 2 },
+      { code: "inj_speed", mode: "LIST", list: [25, 40, 60], levelCount: 3 }
+    ];
+  }
+  return [
+    { code: "mold_temp", mode: "RANGE", rangeMin: 40, rangeMax: 120, levelCount: 2 },
+    { code: "inj_speed", mode: "RANGE", rangeMin: 25, rangeMax: 60, levelCount: 2 },
+    { code: "hold_time", mode: "RANGE", rangeMin: 2, rangeMax: 8, levelCount: 2 },
+    { code: "hold_press", mode: "RANGE", rangeMin: 200, rangeMax: 400, levelCount: 2 },
+    { code: "v_to_p_transfer", mode: "RANGE", rangeMin: 92, rangeMax: 98, levelCount: 2 },
+    { code: "cooling_time", mode: "RANGE", rangeMin: 10, rangeMax: 25, levelCount: 2 },
+    { code: "back_pressure", mode: "RANGE", rangeMin: 20, rangeMax: 80, levelCount: 2 },
+    { code: "nozzle_temp", mode: "RANGE", rangeMin: 150, rangeMax: 175, levelCount: 2 }
+  ];
+}
 
 export function createExperimentWithDefaults(db: Db, input: ExperimentCreateInput): number {
   const experimentId = createExperiment(db, {
@@ -44,19 +86,20 @@ export function createExperimentWithDefaults(db: Db, input: ExperimentCreateInpu
   setExperimentRecipes(db, experimentId, input.recipe_ids ?? []);
 
   const inputParams = listParamDefinitionsByKind(db, experimentId, "INPUT");
-  const defaultActive = new Set(["barrel_zone3", "clamp_tonnage", "inj_speed", "inj_press_limit"]);
-  for (const param of inputParams) {
-    const defaultValue = DEFAULT_INPUT_VALUES[param.code];
+  const defaultFactors = getDefaultActiveFactors(input.design_type);
+  for (const factor of defaultFactors) {
+    const param = inputParams.find((p) => p.code === factor.code);
+    if (!param) continue;
     upsertParamConfig(db, {
       experiment_id: experimentId,
       param_def_id: param.id,
-      active: defaultActive.has(param.code) ? 1 : 0,
-      mode: "FIXED",
-      fixed_value_real: Number.isFinite(defaultValue) ? defaultValue : null,
-      range_min_real: null,
-      range_max_real: null,
-      list_json: null,
-      level_count: 2
+      active: 1,
+      mode: factor.mode,
+      fixed_value_real: null,
+      range_min_real: factor.mode === "RANGE" ? factor.rangeMin ?? null : null,
+      range_max_real: factor.mode === "RANGE" ? factor.rangeMax ?? null : null,
+      list_json: factor.mode === "LIST" ? JSON.stringify(factor.list ?? []) : null,
+      level_count: factor.levelCount ?? null
     });
   }
   return experimentId;
@@ -67,7 +110,7 @@ export function createCustomParam(
   experimentId: number,
   data: Omit<ParamDefinition, "id" | "scope" | "experiment_id">
 ) {
-  const id = createParamDefinition(db, {
+  createParamDefinition(db, {
     scope: "EXPERIMENT",
     experiment_id: experimentId,
     code: data.code,
@@ -78,19 +121,6 @@ export function createCustomParam(
     group_label: data.group_label,
     allowed_values_json: data.allowed_values_json
   });
-  if (data.field_kind === "INPUT") {
-    upsertParamConfig(db, {
-      experiment_id: experimentId,
-      param_def_id: id,
-      active: 0,
-      mode: "FIXED",
-      fixed_value_real: null,
-      range_min_real: null,
-      range_max_real: null,
-      list_json: null,
-      level_count: 2
-    });
-  }
 }
 
 function configToFactor(config: ParamConfig, param: ParamDefinition) {
@@ -115,6 +145,11 @@ export function generateRuns(db: Db, experimentId: number) {
   const inputParams = listParamDefinitionsByKind(db, experimentId, "INPUT");
   const outputParams = listParamDefinitionsByKind(db, experimentId, "OUTPUT");
   const configs = listParamConfigs(db, experimentId);
+  const existingMeta = parseDesignMetadata(getDesignMetadata(db, experimentId));
+  const nonRandomizedParamId =
+    typeof existingMeta.non_randomized_param_id === "number"
+      ? existingMeta.non_randomized_param_id
+      : null;
 
   const activeFactors = configs
     .filter((config) => config.active === 1)
@@ -151,6 +186,9 @@ export function generateRuns(db: Db, experimentId: number) {
   } else {
     designRuns = buildScreenDesign(factorConfigs, experiment.seed, experiment.max_runs);
     metadata = { design: "SCREEN_SAMPLE", factors: factorConfigs };
+  }
+  if (nonRandomizedParamId) {
+    designRuns = applyNonRandomizedParamOrder(designRuns, nonRandomizedParamId);
   }
 
   const recipeIds = getExperimentRecipes(db, experimentId);
@@ -237,7 +275,11 @@ export function generateRuns(db: Db, experimentId: number) {
 
   deleteRunsForExperiment(db, experimentId);
   insertRuns(db, experimentId, runsToInsert, valuesToInsert);
-  upsertDesignMetadata(db, experimentId, JSON.stringify(metadata));
+  upsertDesignMetadata(
+    db,
+    experimentId,
+    JSON.stringify({ ...existingMeta, ...metadata, non_randomized_param_id: nonRandomizedParamId })
+  );
 }
 
 function deriveFallbackValue(config: ParamConfig | undefined): number | null {
@@ -257,6 +299,31 @@ function deriveFallbackValue(config: ParamConfig | undefined): number | null {
     return list.length ? list[0] : null;
   }
   return null;
+}
+
+function applyNonRandomizedParamOrder(
+  runs: Array<{ values: Record<number, number>; coded?: Record<number, number> }>,
+  paramDefId: number
+) {
+  const indexed = runs.map((run, idx) => ({ run, idx }));
+  indexed.sort((a, b) => {
+    const aRaw = a.run.values[paramDefId];
+    const bRaw = b.run.values[paramDefId];
+    const aVal = Number.isFinite(aRaw) ? aRaw : Number.POSITIVE_INFINITY;
+    const bVal = Number.isFinite(bRaw) ? bRaw : Number.POSITIVE_INFINITY;
+    if (aVal !== bVal) return aVal < bVal ? -1 : 1;
+    return a.idx - b.idx;
+  });
+  return indexed.map((item) => item.run);
+}
+
+function parseDesignMetadata(jsonBlob: string | null): Record<string, unknown> {
+  if (!jsonBlob) return {};
+  try {
+    return JSON.parse(jsonBlob) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 function buildReplicateKey(
